@@ -131,6 +131,15 @@ $all = (Check 'host exchanged state'          ($hlog -match 'remote states [1-9]
 $all = (Check 'guest exchanged state'         ($glog -match 'remote states [1-9]'))            -and $all
 $all = (Check 'nothing rejected (host)'       ($hlog -match 'rejected 0'))                     -and $all
 $all = (Check 'nothing rejected (guest)'      ($glog -match 'rejected 0'))                     -and $all
+# 'refused' is a reliable message NOT kept -- no room, too far ahead, or an old
+# stream. Every one of those means the sender has to resend it, so a non-zero
+# count is reliable delivery straining, and in a co-op session the reliable
+# channel is what carries equipment changes and interaction requests. The counter
+# sits in the same log line as 'rejected' and was being skipped.
+$all = (Check 'no reliable message refused'   (-not ($hlog -match 'refused [1-9]') -and
+                                               -not ($glog -match 'refused [1-9]')))           -and $all
+$all = (Check 'no reliable messages backing up' (-not ($hlog -match 'reliable pending [1-9]') -and
+                                                 -not ($glog -match 'reliable pending [1-9]'))) -and $all
 $all = (Check 'no unknown packet kinds'       (-not ($hlog -match 'unknown kinds [1-9]') -and
                                                -not ($glog -match 'unknown kinds [1-9]')))     -and $all
 $all = (Check 'no errors in either log'       (-not ($hlog -match '\] ERR ') -and
