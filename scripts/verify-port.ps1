@@ -22,7 +22,7 @@ $ErrorActionPreference = 'Stop'
 if (-not (Test-Path $Exe)) { throw "Game exe not found: $Exe" }
 
 $py = @'
-import struct, sys
+import os, struct, sys
 
 path = sys.argv[1]
 d = open(path, 'rb').read()
@@ -144,6 +144,51 @@ ok('Troc instances span is still 0x311A0', (0x6EC8540 - 0x6E973A0) == 0x311A0)
 ok('Troc span is one contiguous .idata region',
    sec_of(0x6E973A0) == '.idata' and sec_of(0x6EC8540 - 1) == '.idata')
 
+# ---- code addresses: do their prologue heads still match? ----
+# The heads live in offsets.h as byte arrays. Rather than restating them here
+# (where they could drift from the real values), read them out of the header and
+# compare against the image. This is the check that says whether each code
+# address is usable on this build, which is exactly what the runtime guards in
+# troc_sniffer.cpp / game_clock.cpp / player_reader.cpp decide at load time.
+print()
+print('== code addresses: prologue heads against this image ==')
+import re
+# The repo root is the parent of the directory holding this script. The script is
+# written to a temp file by the PowerShell wrapper, so locate offsets.h relative to
+# the checkout instead: $root is passed in as an environment variable.
+_root = os.environ.get('CDMP_ROOT', os.getcwd())
+offsets_src = open(os.path.join(_root, 'src', 'mod', 'game', 'offsets.h'),
+                   encoding='utf-8', errors='replace').read()
+def head_bytes(name):
+    m = re.search(re.escape(name) + r'\[\] = \{(.*?)\};', offsets_src, re.S)
+    if not m:
+        return None
+    return bytes(int(x, 16) for x in re.findall(r'0x([0-9A-Fa-f]{2})', m.group(1)))
+
+# (label, rva, head array name, whether it must match for co-op to work)
+code_addrs = [
+    ('kClientPostPacket        (injection: sends)', 0x3A5570,  'kClientPostPacketHead',       True),
+    ('kClientOnRecvPacket      (capture: receives)', 0x3A5900, 'kClientOnRecvPacketHead',     True),
+    ('kClientClock             (time sync)',        0x1416B80, 'kClientClockHead',            False),
+    ('kMinimapIconDecide       (minimap icon)',     0x9E89C0,  'kMinimapIconDecideHead',      False),
+    ('kServerOtherEquipWriter  (equip relay)',      0x29ED1F0, 'kServerOtherEquipWriterHead', False),
+]
+for label, rva, hname, must_match in code_addrs:
+    sig = head_bytes(hname)
+    if sig is None:
+        ok('%s head array present' % label, False, 'no %s in offsets.h' % hname)
+        continue
+    off = doff(rva)
+    got = bytes(d[off:off + len(sig)]) if off is not None else b''
+    if must_match:
+        ok('%s prologue matches' % label, got == sig,
+           '' if got == sig else 'expected %s, found %s' % (
+               ' '.join('%02X' % b for b in sig[:8]), ' '.join('%02X' % b for b in got[:8])))
+    else:
+        # Absent is the documented, safe outcome: the feature disables itself.
+        ok('%s does not match (feature disables itself)' % label, got != sig,
+           'matches again! re-resolve it' if got == sig else '')
+
 # ---- code guards that can no longer match ----
 print()
 print('== code-address guards (feature refuses safely when these fail) ==')
@@ -189,5 +234,8 @@ sys.exit(1 if fails else 0)
 
 $tmp = Join-Path $env:TEMP "cdmp_verify_port.py"
 Set-Content -Path $tmp -Value $py -Encoding UTF8
+# The embedded Python reads offsets.h to compare the prologue heads against the
+# image, so tell it where the checkout is rather than guessing from __file__.
+$env:CDMP_ROOT = $root
 python $tmp $Exe
 exit $LASTEXITCODE
