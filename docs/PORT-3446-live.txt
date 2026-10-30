@@ -1,0 +1,51 @@
+﻿# Live probe on the UPDATED game (build 1.0.0.3446)
+# Captured: 2026-10-30T14:20:58
+#
+# The game auto-updated while this session was running:
+#   1.0.0.3424  PE 0x6AE387F2  336,264,088 bytes   <- what the port targets
+#   1.0.0.3446  PE 0x6AE46DD0  332,786,072 bytes   <- what is now on disk
+#
+# EVERY address in offsets.h is invalid on 3446. verify-port.ps1 reports 24
+# failures. The mod's PE-timestamp guards refuse to install (troc_sniffer.cpp:607,
+# camera_reader.cpp:48, player_reader.cpp:30), so nothing is corrupted; the mod
+# simply does not activate.
+
+## the addresses that moved (live scan, 3446)
+# kClientPostPacket: 3424 0x3A5570 -> 3446 0x3A55B0  (+0x40)
+# kClientOnRecvPacket: 3424 0x3A5900 -> 3446 0x3A5940 (+0x40)
+4 match(es) (limit reached)
+  exe+0x3A55B0
+  exe+0x4A7450
+  exe+0x4D74A0
+  exe+0x4D77B0
+4 match(es) (limit reached)
+  exe+0x3A5940
+  exe+0x3AAF30
+  exe+0x3BB140
+  exe+0x3C5830
+
+## the clock flag, resolved again from code (4 sites agree)
+# 3424 clock flag 0x70CACAD -> 3446 clock flag 0x70CDCAD  (+0x1000)
+9 match(es)
+  exe+0x561BB5
+  exe+0xA38A46
+  exe+0x15F5550
+  exe+0x2E442A9
+  exe+0x2F0B197
+  exe+0x300B9E2
+  exe+0x3EACE5B
+  exe+0x401B490
+  exe+0x4080CA2
+target exe+0x70CDCAD  value 0x46F07897E0000001
+target exe+0x70CDCAD  value 0x46F07897E0000001
+target exe+0x70CDCAD  value 0x46F07897E0000001
+target exe+0x70CDCAD  value 0x46F07897E0000001
+
+## LIVE PROOF the clock fields are right (not inferred)
+# flag 0x70CDCAD reads 1, stable -> the 'clock ready' flag
+# flag+0x3C advances 134323,135411,136500,137574,138659,139743,140824,141902
+#   over 1.947 s -> a real advancing counter at ~3892 units/s
+# flag+0x34 reads non-zero (0x46F0DF00 as u32)
+exe+0x70CDCAD: 5111718170759004161 (0x46F07897E0000001)
+exe+0x70CDCE1: 13835058069357256448 (0xC000000346F0DF00)
+exe+0x70CDCE9: 5404319552844762609 (0x4B00000000028DF1)

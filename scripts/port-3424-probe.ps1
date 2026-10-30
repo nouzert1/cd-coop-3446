@@ -93,6 +93,16 @@ if ($canImage) {
     # 0d. The one inferred global that lives in file-backed .idata, so it can be
     #     read without the game. The rest are zero-fill and cannot.
     RunImage @('dump', 'exe+6EB2AD8', '--size', '0x30')
+    # 0e. Which predicted globals does code actually reach? x64 reads data
+    #     RIP-relatively, so a global that is real and used has a displacement
+    #     landing on it. The minimap pair is the interesting one: this disassembly
+    #     shows both roots selected by a TLS flag, exactly as offsets.h documents.
+    foreach ($g in @('0x71AECF8', '0x71AEDE8', '0x71AEDF0', '0x6E973A0',
+                     '0x6EC8540', '0x6EB2AD8')) {
+        RunImage @('xrefs', $g, '--max', '6')
+    }
+    RunImage @('disasm', 'exe+0x8DDE3B', '--count', '6')  # the minimap root pair
+    RunImage @('disasm', 'exe+0x4E7A040', '--count', '8')  # the Troc range accessor
     ""
 }
 

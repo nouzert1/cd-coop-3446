@@ -33,11 +33,19 @@ stamp = struct.unpack_from('<I', d, pe + 8)[0]
 imgbase = struct.unpack_from('<Q', d, pe + 24 + 24)[0]
 sh = pe + 24 + optsz
 secs = []
+exec_secs = {}  # va -> name, for sections that actually contain code
 for i in range(nsec):
     o = sh + i * 40
     nm = d[o:o+8].rstrip(b'\x00').decode('latin1')
     vs, va, rs, ro = struct.unpack_from('<IIII', d, o + 8)
+    ch = struct.unpack_from('<I', d, o + 36)[0]
     secs.append((nm, va, vs, ro, rs))
+    # IMAGE_SCN_MEM_EXECUTE (0x20000000). The section NAMES in this binary are
+    # decoys: the real code sits in ".impdata" (0x5587000 bytes), while ".text",
+    # ".text1" and ".xcode" are readable but NOT executable. Anything that walks
+    # code must select on this flag or it will scan data and find noise.
+    if ch & 0x20000000:
+        exec_secs[va] = nm
 
 def sec_of(rva):
     best = None
@@ -153,6 +161,106 @@ ok('kClientFrameClockMs sits 0x34 past the flag', 0x70CACE1 - _clock_target == 0
    'gap 0x%X' % (0x70CACE1 - _clock_target))
 ok('kClientFrameClockUs sits 0x3C past the flag', 0x70CACE9 - _clock_target == 0x3C,
    'gap 0x%X' % (0x70CACE9 - _clock_target))
+
+# The same question for the other INFERRED globals: does any code actually reach
+# them? x64 reads data RIP-relatively, so a global that is real and used has a
+# disp32 somewhere that lands exactly on it. Encode those displacements directly
+# and search, rather than shelling out to the probe's `xrefs` (same test, no
+# subprocess, and it keeps this script self-contained).
+#
+# What "no reference" means depends on the global, so each entry says which answer
+# is expected:
+#   - a global the game READS must have references. None would mean the predicted
+#     address is wrong, because correct-but-unused data does not exist in shipped
+#     code.
+#   - an END address or an address only the mod uses is computed, never loaded, so
+#     no reference is the correct answer and is not evidence either way.
+print()
+print('== do predicted globals have code reaching them? ==')
+print('   executable sections (by flag, not name): %s'
+      % ', '.join('%s@0x%X' % (n, v) for v, n in sorted(exec_secs.items())))
+_referenced = [
+    # name, predicted rva, must-have-references
+    ('kClientClockBias',    0x71AECF8, True),
+    ('kMinimapIconRoot',    0x71AEDE8, True),
+    ('kMinimapIconRootAlt', 0x71AEDF0, True),
+    ('kTrocInstancesBegin', 0x6E973A0, True),
+    ('kTrocInstancesEnd',   0x6EC8540, False),
+    ('kFieldTimeClient',    0x6EB2AD8, False),
+]
+# Shapes that reach data RIP-relatively on x64. (opcode, has own modrm, disp at, len)
+_ref_shapes = [
+    (b'\x48\x8B', False, 3, 7),   # mov r64,[rip+d]
+    (b'\x48\x8D', False, 3, 7),   # lea r64,[rip+d]
+    (b'\x80\x3D', True,  2, 7),   # cmp [rip+d],imm8
+    (b'\x8B',     False, 2, 6),   # mov r32,[rip+d]
+]
+def _refs_to(rva):
+    """Sites in the image whose RIP-relative operand lands on this rva."""
+    hits = 0
+    for op, own_modrm, disp_at, length in _ref_shapes:
+        start = 0
+        while True:
+            i = d.find(op, start)
+            if i < 0:
+                break
+            start = i + 1
+            if not own_modrm and (d[i + len(op)] & 0xC7) != 0x05:
+                continue
+            off = i + disp_at
+            if off + 4 > len(d):
+                continue
+            # A hit only counts if it is REAL FILE DATA inside a section: the file
+            # offset must fall in [ro, ro+rsize), and the RVA it maps to must fall in
+            # [va, va+vsize). Using max(vsize, rsize) for either bound maps file
+            # offsets in the padding onto plausible-looking RVAs and reported
+            # thousands of phantom references (2137 for one global), so the range
+            # check has to be exact.
+            site = None
+            for nm, va, vs, ro, rs in secs:
+                if ro <= i < ro + rs:
+                    within = i - ro
+                    # Executable sections only, selected by CHARACTERISTICS and not
+                    # by name: in this binary the names are decoys. The real code
+                    # (0x5587000 bytes) is in a section called ".impdata" with
+                    # IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_CNT_CODE, while ".text",
+                    # ".xcode" and ".text1" are NOT executable and matching inside
+                    # them inflates the count into the thousands -- arbitrary data
+                    # contains byte pairs that look like `mov r32,[rip+d]`.
+                    is_exec = exec_secs.get(va) == nm
+                    if within < vs and is_exec:
+                        site = va + within
+                    break
+            if site is None:
+                continue
+            disp = int.from_bytes(d[off:off + 4], 'little', signed=True)
+            if site + length + disp == rva:
+                hits += 1
+    return hits
+
+# A caveat that matters: this scanner matches opcode bytes at any offset, so it also
+# reports sites that are mid-instruction (the same bytes appearing inside a longer
+# instruction or in data-like padding). For kMinimapIconRoot it counts thousands,
+# which is far more than the handful of real readers; the true number is not what
+# this establishes. What it establishes is EXISTENCE: a global the game never reads
+# would have zero. Confirming a specific site needs disassembly from a real
+# instruction boundary -- the probe's `xrefs`/`disasm` do that, and they show
+# exe+0x8DDE3B as the deciding pattern:
+#     mov  rax, [root]      ; kMinimapIconRoot
+#     cmp  byte [rdx+rcx],0
+#     cmovnz rax, [rootAlt] ; kMinimapIconRootAlt, the documented "TLS flag" alternate
+# Both globals appear there together, which is what the offsets.h comment predicted.
+for name, rva, must in _referenced:
+    n = _refs_to(rva)
+    if must:
+        ok('%s is reached by code' % name, n > 0,
+           '%d byte-pattern hit(s) near 0x%X; existence is what this shows'
+           % (n, rva) if n else
+           'no site reaches 0x%X -- the predicted address is wrong' % rva)
+    else:
+        # Reported, not asserted: absence is expected but proves nothing.
+        print('  note  %-20s %d reference(s) (absence expected: the address is computed, not loaded)'
+              % (name, n))
 
 # The single-constant delta is an approximation, and the measured globals are the
 # proof: they are all data slots resolved by reading the binary, and their deltas

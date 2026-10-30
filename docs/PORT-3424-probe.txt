@@ -1,4 +1,4 @@
-﻿# cdmp_probe - port 3424 (2026-10-30T13:53:22)
+﻿# cdmp_probe - port 3424 (2026-10-30T14:17:45)
 # game running: False
 # image: C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64\CrimsonDesert.exe
 
@@ -54,5 +54,57 @@ target exe+0x71A84E8  value <unreadable>
 +0018  0000000000000000        0.0000       0.0000  
 +0020  0000000000000000        0.0000       0.0000  
 +0028  0000000145AB6C00     5485.5000               exe+0x5AB6C00
+### probe --image xrefs 0x71AECF8 --max 6
+mov r64,[rip+d]    exe+0x8179C2       (target 0x1471AECF8)
+mov r64,[rip+d]    exe+0x825B3D       (target 0x1471AECF8)
+mov r64,[rip+d]    exe+0x826861       (target 0x1471AECF8)
+mov r64,[rip+d]    exe+0x82C795       (target 0x1471AECF8)
+mov r64,[rip+d]    exe+0x82C82D       (target 0x1471AECF8)
+mov r64,[rip+d]    exe+0x82CA61       (target 0x1471AECF8)
+6 reference(s)
+### probe --image xrefs 0x71AEDE8 --max 6
+mov r64,[rip+d]    exe+0x3DD565       (target 0x1471AEDE8)
+mov r64,[rip+d]    exe+0x70D549       (target 0x1471AEDE8)
+mov r64,[rip+d]    exe+0x8195C4       (target 0x1471AEDE8)
+mov r64,[rip+d]    exe+0x81B794       (target 0x1471AEDE8)
+mov r64,[rip+d]    exe+0x842641       (target 0x1471AEDE8)
+mov r64,[rip+d]    exe+0x842731       (target 0x1471AEDE8)
+6 reference(s)
+### probe --image xrefs 0x71AEDF0 --max 6
+mov r64,[rip+d]    exe+0x3DD785       (target 0x1471AEDF0)
+mov r64,[rip+d]    exe+0xA9B2F3       (target 0x1471AEDF0)
+mov r64,[rip+d]    exe+0xAEEAF4       (target 0x1471AEDF0)
+mov r64,[rip+d]    exe+0xB1B50C       (target 0x1471AEDF0)
+mov r64,[rip+d]    exe+0xB1B7EE       (target 0x1471AEDF0)
+mov r64,[rip+d]    exe+0xE9AC15       (target 0x1471AEDF0)
+6 reference(s)
+### probe --image xrefs 0x6E973A0 --max 6
+lea r64,[rip+d]    exe+0x1B68AB       (target 0x146E973A0)
+lea r64,[rip+d]    exe+0x4E7A040      (target 0x146E973A0)
+lea r64,[rip+d]    exe+0x4E7A04C      (target 0x146E973A0)
+lea r64,[rip+d]    exe+0x4E7A05C      (target 0x146E973A0)
+lea r64,[rip+d]    exe+0x4E7A068      (target 0x146E973A0)
+lea r64,[rip+d]    exe+0x4E7A080      (target 0x146E973A0)
+6 reference(s)
+### probe --image xrefs 0x6EC8540 --max 6
+no RIP-relative reference to exe+0x6EC8540 found in the image
+### probe --image xrefs 0x6EB2AD8 --max 6
+no RIP-relative reference to exe+0x6EB2AD8 found in the image
+### probe --image disasm exe+0x8DDE3B --count 6
+exe+0x8DDE3B       mov rax, [0x00000001471AEDE8]                    -> exe+0x71AEDE8 (in zero-filled memory; loaded only at runtime)
+exe+0x8DDE42       cmp byte ptr [rdx+rcx*1], 0x00                
+exe+0x8DDE46       cmovnz rax, [0x00000001471AEDF0]                 -> exe+0x71AEDF0 (in zero-filled memory; loaded only at runtime)
+exe+0x8DDE4E       mov rax, [rax]                                
+exe+0x8DDE51       mov rcx, [rax+0x08]                           
+exe+0x8DDE55       mov r14, [rcx+0x2F8]                          
+### probe --image disasm exe+0x4E7A040 --count 8
+exe+0x4E7A040      lea rcx, [0x0000000146E973A0]                    -> exe+0x6E973A0 (byte 0)
+exe+0x4E7A047      jmp 0x00000001404ECFB0                        
+exe+0x4E7A04C      lea rcx, [0x0000000146E973A0]                    -> exe+0x6E973A0 (byte 0)
+exe+0x4E7A053      add rcx, 0x20                                 
+exe+0x4E7A057      jmp 0x000000014043F700                        
+exe+0x4E7A05C      lea rcx, [0x0000000146E973A0]                    -> exe+0x6E973A0 (byte 0)
+exe+0x4E7A063      jmp 0x00000001404E26E0                        
+exe+0x4E7A068      lea rcx, [0x0000000146E973A0]                    -> exe+0x6E973A0 (byte 0)
 ## live part skipped: CrimsonDesert.exe is not running
 ## the globals in zero-filled memory (clock, minimap, world) need the game open.

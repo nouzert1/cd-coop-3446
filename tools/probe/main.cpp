@@ -16,6 +16,7 @@
 #include <format>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -53,6 +54,7 @@ void usage() {
         "  watch <addr> [off ...] [--type T] [--interval MS] [--seconds N]\n"
         "  dump <addr> [--size N]               qword view with floats, pointers, RTTI\n"
         "  disasm <addr> [--count N]            decode instructions, resolving RIP targets\n"
+        "  xrefs <addr> [--max N]               find code that references this address\n"
         "  rtti <addr>                          class name of the object at addr\n"
         "  classes <text> [--max N]             RTTI class names containing text\n"
         "  vtables <.?AVName@@>                 vtable address(es) of an RTTI class\n"
@@ -489,6 +491,113 @@ int cmd_disasm(const Process& p, const Args& a) {
 #endif
 }
 
+// Find code that references an address. x64 reaches data RIP-relatively, so the
+// absolute value never appears as a literal in the image -- `findptr` looks for the
+// qword and finds nothing even for globals known to be correct. What DOES appear is
+// the 4-byte displacement, and for each instruction length L the site must satisfy
+// d = target - site - L. So: scan the code for every possible encoding shape and
+// report the sites whose displacement lands exactly on the target.
+//
+// This is what turns "the flat delta predicts 0x71AEDE8" into "and here is the
+// instruction that reads it". A global with no referencing instruction is suspect;
+// one with several is confirmed.
+int cmd_xrefs(const Process& p, const Args& a) {
+    if (a.pos.size() < 2) return usage(), 2;
+    auto target = parse_addr(p, a.pos[1]);
+    if (!target) return std::puts("Bad address"), 2;
+    // A bare "0x70CACAD" parses as that literal value, while the addresses the scan
+    // computes are absolute (base + rva). Accept either reading so both
+    // `xrefs 0x70CACAD` and `xrefs exe+70CACAD` work -- the value from offsets.h is
+    // an RVA, and typing it without the prefix is the natural thing to do.
+    uint64_t want = *target;
+    if (want < p.module_base()) want += p.module_base();
+    const size_t max = parse_count(a.get("--max", "20"), 20);
+
+    // Instruction shapes that carry a RIP-relative disp32.
+    //
+    // `nbytes` is how many opcode bytes precede an OPTIONAL ModRM, and
+    // `opcode_has_modrm` says whether one of those bytes already IS the ModRM.
+    // Getting this wrong is silent: for `80 3D disp32 imm8` the 0x3D is the ModRM
+    // already (mod=00, rm=101 -> RIP-relative), so looking for a further ModRM byte
+    // reads the displacement's first byte instead, the (modrm & 0xC7) == 5 test
+    // fails, and every real reference is skipped -- which is exactly what happened
+    // the first time and made the control case report zero references to a global
+    // with four of them.
+    struct Shape {
+        const char* name;
+        uint8_t bytes[4];
+        size_t nbytes;
+        bool opcode_has_modrm;
+        size_t disp_at;
+        size_t length;
+    };
+    static const Shape shapes[] = {
+        {"mov r64,[rip+d]", {0x48, 0x8B}, 2, false, 3, 7},
+        {"mov r32,[rip+d]", {0x8B}, 1, false, 2, 6},
+        {"mov [rip+d],r64", {0x48, 0x89}, 2, false, 3, 7},
+        {"mov [rip+d],r32", {0x89}, 1, false, 2, 6},
+        {"movzx r32,[rip+d]", {0x0F, 0xB6}, 2, false, 3, 7},
+        {"movsxd r64,[rip+d]", {0x48, 0x63}, 2, false, 3, 7},
+        {"lea r64,[rip+d]", {0x48, 0x8D}, 2, false, 3, 7},
+        // These encode RIP-relative in the opcode itself: no separate ModRM.
+        {"cmp [rip+d],imm8", {0x80, 0x3D}, 2, true, 2, 7},
+        {"cmp [rip+d],imm32", {0x81, 0x3D}, 2, true, 2, 10},
+        {"mov [rip+d],al", {0x88, 0x05}, 2, true, 2, 6},
+        {"mov al,[rip+d]", {0x8A, 0x05}, 2, true, 2, 6},
+        {"test [rip+d],imm8", {0xF6, 0x05}, 2, true, 2, 7},
+    };
+
+    size_t total = 0;
+    // The image is scanned in chunks rather than one p.read() per byte: the per-call
+    // overhead made a full sweep take minutes, which is unusable interactively.
+    //
+    // Note what this CAN and cannot say. Matching opcode bytes at every offset also
+    // matches mid-instruction and data bytes, so the count runs high -- for
+    // kMinimapIconRoot it is thousands against a handful of real readers. Treat a
+    // nonzero result as "code reaches this address", not as a reference count, and
+    // confirm a specific site by disassembling it from a real instruction boundary.
+    //
+    // Sites are collected into a set first: the executable sections can overlap in
+    // the mapped image, so the same bytes are reachable under more than one rva and
+    // a naive scan prints every hit twice.
+    const uint64_t base = p.module_base();
+    constexpr size_t kChunk = 8 * 1024 * 1024;
+    std::vector<uint8_t> buf;
+    std::set<uint64_t> seen;
+    for (const Shape& s : shapes) {
+        if (total >= max) break;
+        for (uint64_t start = 0; start + 16 < p.module_size() && total < max;
+             start += kChunk) {
+            const size_t want_bytes = static_cast<size_t>(
+                std::min<uint64_t>(kChunk, p.module_size() - start));
+            buf.resize(want_bytes + 16);
+            if (!p.read(base + start, buf.data(), want_bytes)) continue;
+            for (size_t i = 0; i + 16 <= want_bytes && total < max; ++i) {
+                const uint8_t* b = buf.data() + i;
+                if (std::memcmp(b, s.bytes, s.nbytes) != 0) continue;
+                if (!s.opcode_has_modrm && (b[s.nbytes] & 0xC7) != 0x05) continue;
+                int32_t disp = 0;
+                std::memcpy(&disp, b + s.disp_at, sizeof disp);
+                const uint64_t site = base + start + i;
+                const uint64_t t = site + s.length + static_cast<int64_t>(disp);
+                if (t != want) continue;
+                if (!seen.insert(site).second) continue;
+                std::printf("%-18s %-18s (target 0x%llX)\n", s.name,
+                            p.describe(site).c_str(),
+                            static_cast<unsigned long long>(t));
+                ++total;
+            }
+        }
+    }
+    if (total == 0) {
+        std::printf("no RIP-relative reference to %s found in the image\n",
+                    p.describe(want).c_str());
+        return 1;
+    }
+    std::printf("%zu reference(s)\n", total);
+    return 0;
+}
+
 int cmd_rtti(const Process& p, const Args& a) {    if (a.pos.size() < 2) return usage(), 2;
     auto addr = parse_addr(p, a.pos[1]);
     if (!addr) return std::puts("Bad address"), 2;
@@ -590,7 +699,7 @@ int main(int argc, char** argv) {
         if (c == "chain" || c == "watch" || c == "rtti") {
             std::printf("'%s' needs live memory (a running game); --image only reads the file.\n"
                         "Commands that work with --image: info scan sigs rip read dump disasm "
-                        "classes vtables findptr\n", c.c_str());
+                        "xrefs classes vtables findptr\n", c.c_str());
             return 2;
         }
         if (a.flag("--heap")) {
@@ -618,6 +727,7 @@ int main(int argc, char** argv) {
     if (cmd == "watch") return cmd_watch(p, a);
     if (cmd == "dump") return cmd_dump(p, a);
     if (cmd == "disasm") return cmd_disasm(p, a);
+    if (cmd == "xrefs") return cmd_xrefs(p, a);
     if (cmd == "rtti") return cmd_rtti(p, a);
     if (cmd == "classes") return cmd_classes(p, a);
     if (cmd == "vtables") return cmd_vtables(p, a);
