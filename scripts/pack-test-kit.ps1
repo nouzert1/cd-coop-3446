@@ -149,6 +149,50 @@ guest_loot=1
     Copy-Item $iniSrc (Join-Path $kit 'cdmp.ini')
 }
 
+# --- force the keys this test depends on, whichever INI was used -----------
+# Copying the build's own INI is not enough, because it is the mod's DEFAULT file:
+# on this build it says transport=udp, which is the loopback transport used for
+# local testing and cannot reach another PC at all. A kit shipped with it would
+# look correct, install cleanly, and fail to connect with nothing in the README to
+# explain why. The guard below already refused to pack that file; this makes the
+# chosen values authoritative instead of depending on what happened to be in the
+# source, so the kit is correct whether or not a build-output INI exists.
+$kitIni = Join-Path $kit 'cdmp.ini'
+$iniLines = Get-Content $kitIni -Encoding Unicode
+function Set-IniKey([string[]]$lines, [string]$section, [string]$key, [string]$value) {
+    $out = New-Object System.Collections.Generic.List[string]
+    $cur = ''
+    $done = $false
+    foreach ($l in $lines) {
+        $m = [regex]::Match($l, '^\s*\[([^\]]+)\]')
+        if ($m.Success) {
+            # Leaving the section without having seen the key: insert it there.
+            if ($cur -eq $section -and -not $done) { $out.Add("$key=$value"); $done = $true }
+            $cur = $m.Groups[1].Value
+        } elseif ($cur -eq $section -and -not $done) {
+            $k = [regex]::Match($l, '^\s*([^;=\s]+)\s*=')
+            if ($k.Success -and $k.Groups[1].Value -eq $key) {
+                $out.Add("$key=$value")
+                $done = $true
+                continue
+            }
+        }
+        $out.Add($l)
+    }
+    if ($cur -eq $section -and -not $done) { $out.Add("$key=$value"); $done = $true }
+    if (-not $done) { $out.Add("[$section]"); $out.Add("$key=$value") }
+    return $out.ToArray()
+}
+
+# The two-PC test is over Steam. Anything else cannot leave this machine.
+$iniLines = Set-IniKey $iniLines 'net' 'transport' 'steam'
+# Not asserted by the guard below, but the coop flags are what the test exercises.
+foreach ($kv in @(@('coop', 'enemy_auto', '1'), @('coop', 'guest_hits', '1'),
+                  @('coop', 'boss_safe', '1'), @('coop', 'guest_loot', '1'))) {
+    $iniLines = Set-IniKey $iniLines $kv[0] $kv[1] $kv[2]
+}
+Set-Content -Path $kitIni -Value $iniLines -Encoding Unicode
+
 # --- the read-me the friend actually follows ------------------------------
 @'
 ==========================================================

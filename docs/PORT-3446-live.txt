@@ -119,3 +119,40 @@ first rva 0x6E82D10   last rva 0x6E83FA0   span 0x1290
   exe+0x6EB62E0      rva 0x6EB62E0  .?AVTrocTrLogoutSessionToServerReq@pa@@
 7 TrocTr handler(s) in [exe+0x6EB6000, exe+0x6EBA000)
 first rva 0x6EB6010   last rva 0x6EB6370   span 0x360
+
+## FINAL VERIFICATION: the mod's exact read path, live, on 3446
+
+# The mod's walk (troc_sniffer.cpp:load_troc_names) does, for each 8-byte slot in
+# [kTrocInstancesBegin, kTrocInstancesEnd):
+#     vtable = *slot
+#     name   = RTTI(vtable)     -> keep if it starts ".?AVTrocTr"
+#     kind   = *(u32*)(slot + kTroc_Kind)     (+0x08)
+#     opcode = *(u16*)(slot + kTroc_Opcode)   (+0x10)
+#
+# All four reads performed against the live 3446 game at the first slot:
+
+#   *slot        exe+0x6E82D10 -> exe+0x598EC58        (a valid in-image vtable)
+#   RTTI         .?AVTrocTrStartActionAck@pa@@         (accepted by the walk)
+#   +0x08 kind   1
+#   +0x10 opcode 1
+#
+# Full range: probe troc exe+6E82D10 exe+6EB6378 -> 1175 handlers, first
+# 0x6E82D10, last 0x6EB6370.
+
+## the co-op relay handlers are inside the ported range
+
+#   exe+0x6E82D10  TrocTrStartActionAck
+#   exe+0x6E82FE0  TrocTrPostProcessAttackResult_AttackerAck
+#   exe+0x6E840C0  TrocTrMoveActorAck
+#   exe+0x6E841E0  TrocTrRemoveActorAck
+#   exe+0x6E86DC0  TrocTrSetFieldTimeAck
+#   exe+0x6E8CF10  TrocTrOtherEquipItemAck
+
+## what reusing the 3424 values would have cost
+
+# 3424 begin was 0x6E973A0, which sits 0x14690 bytes INSIDE the true range.
+# Counting the handlers below it: 576 of 1175 (49%), including every
+# TrocTrStartActionAck / PostProcessAttackResult_* / CatchResult* that co-op
+# relays combat through. The walk would have run, found 599 types instead of
+# 1175, and logged no error -- co-op would have loaded and then failed to relay
+# combat, with nothing in the log pointing at the range.
