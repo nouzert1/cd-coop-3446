@@ -1,5 +1,13 @@
 // Throwaway: prove the room codec is injective and reversible over the lobby id
 // range Steam actually uses, and that no two ids share a code.
+//
+// Note on the round trip: the code carries only the LOW 32 BITS of a lobby id
+// (the high bits are the CSteamID type, identical for every lobby), so decode
+// returns the low part with that constant prefix restored -- not the bare number
+// that was passed in. The check compares against kLobbyIdHighBits | id for that
+// reason. Comparing against the bare id was correct before the fix and is exactly
+// the kind of assertion that would have hidden the bug, which is why the live
+// lobby id is checked explicitly at the bottom as well.
 #include <cstdio>
 #include <cstdint>
 #include <set>
@@ -12,7 +20,7 @@ int main() {
     std::set<std::string> seen;
     int bad = 0;
 
-    // Steam allocates lobby ids from 1 upwards; 20 million covers far beyond any
+    // The low 32 bits are what vary between rooms; 20 million covers far beyond any
     // realistic allocation while still being a fast exhaustive check.
     constexpr uint64_t kLimit = 20000000;
     for (uint64_t id = 1; id <= kLimit; ++id) {
@@ -25,13 +33,24 @@ int main() {
             if (bad++ < 5) std::printf("COLLISION id=%llu code=%s\n", (unsigned long long)id, code.c_str());
         }
         uint64_t back = 0;
-        if (!room_code_decode(code, back) || back != id) {
+        const uint64_t want = kLobbyIdHighBits | id;
+        if (!room_code_decode(code, back) || back != want) {
             if (bad++ < 5)
-                std::printf("ROUNDTRIP id=%llu code=%s back=%llu\n", (unsigned long long)id, code.c_str(),
-                            (unsigned long long)back);
+                std::printf("ROUNDTRIP id=%llu code=%s back=%llu want=%llu\n", (unsigned long long)id,
+                            code.c_str(), (unsigned long long)back, (unsigned long long)want);
         }
     }
     std::printf("checked %llu ids, collisions/roundtrip errors: %d\n", (unsigned long long)kLimit, bad);
+
+    // THE CASE THAT FAILED LIVE: a real lobby id, 57 bits wide. The old codec
+    // refused everything this size and the room code came out empty.
+    const uint64_t live = 109775242893225821ull;
+    const std::string live_code = room_code_encode(live);
+    uint64_t live_back = 0;
+    const bool live_ok = !live_code.empty() && room_code_decode(live_code, live_back) && live_back == live;
+    std::printf("live lobby %llu -> code '%s' -> %llu ; ok=%d\n", (unsigned long long)live,
+                live_code.c_str(), (unsigned long long)live_back, live_ok ? 1 : 0);
+    if (!live_ok) ++bad;
 
     // The bound must be refused, and the fold must land on the right digit.
     uint64_t t = 0;

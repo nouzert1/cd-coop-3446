@@ -1332,16 +1332,39 @@ void test_enemy_zone_machine() {
 
 // Room codes: the short text a player reads out to enter a friend's world.
 void test_room_code() {
-    // Round trip over the range a Steam lobby id actually lives in.
+    // THE REGRESSION THAT MATTERED. This is a real lobby id, read live from the
+    // game while the mod reported itself as hosting with an empty code:
+    //   Room: hosting, code  (lobby 109775242893225821, host SteamID64 765611994...)
+    // and the panel showed "(no code: room: hosting)".
+    //
+    // The old codec assumed lobby ids were small ("Steam allocates from 1 upwards")
+    // and refused anything above 35 bits. This id is 57 bits, because Steam packs
+    // the CSteamID type into the high bits, so EVERY real lobby was refused and the
+    // room code was always empty. Encoding the low 32 bits and rebuilding the high
+    // ones on decode fixes it; this case is here so it cannot come back.
+    {
+        const uint64_t live = 109775242893225821ull;
+        const std::string code = net::room_code_encode(live);
+        CHECK(!code.empty());                       // <- this is what failed before
+        CHECK(code.size() == static_cast<size_t>(net::kRoomCodeLen));
+        uint64_t back = 0;
+        CHECK(net::room_code_decode(code, back));
+        CHECK(back == live);                        // exact round trip, prefix included
+    }
+
+    // Round trip over the range the sequential part of a lobby id lives in.
     for (uint64_t id : {1ull, 2ull, 31ull, 32ull, 1024ull, 0xFFFFFFFFull, 0x7FFFFFFFull}) {
         const std::string code = net::room_code_encode(id);
         CHECK(code.size() == static_cast<size_t>(net::kRoomCodeLen));
         uint64_t back = 0;
         CHECK(net::room_code_decode(code, back));
-        CHECK(back == id);
+        // Only the low 32 bits travel in the code; the rest is the CSteamID type,
+        // which decode restores to the constant every lobby shares.
+        CHECK(back == (id | net::kLobbyIdHighBits));
+        CHECK((back & net::kLobbyIdLowMask) == id);
     }
     CHECK(net::room_code_encode(0).empty());
-    // An id that does not fit in 7 digits must be refused, never truncated into
+    // A low part that does not fit in 7 digits must be refused, never truncated into
     // a different (possibly someone else's) room.
     CHECK(net::room_code_encode(net::kRoomCodeMaxId + 1).empty());
     CHECK(!net::room_code_encode(net::kRoomCodeMaxId).empty());
