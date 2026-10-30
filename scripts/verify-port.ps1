@@ -153,14 +153,21 @@ guards = [
     ('kServerOtherEquipWriter', 0x29ED1F0, bytes([0x48,0x89,0x5C,0x24,0x08,0x4C,0x89,0x4C])),
     ('kClientClock', 0x1416B80, bytes([0x80,0x3D,0xAE,0x61,0x87,0x05,0x00,0x75,0x17])),
 ]
+# These three sites were resolved on 2976 and cannot be re-resolved offline for
+# 3424. On 3424 they are EXPECTED not to match, and each feature then disables
+# itself instead of reading the wrong address. So "no match" is the correct
+# result here and must NOT be counted as a failure -- but the check is asserted
+# anyway, because the interesting event is the opposite one: if a site starts
+# matching again, the signature is not where it was thought to be and the guard
+# is now protecting something else.
+print('  (on this build these are expected NOT to match: the feature disables itself)')
 for name, rva, sig in guards:
     n = len(find_all(sig))
     off = doff(rva)
     here = (d[off:off+len(sig)] == sig) if off else False
-    print('  %-26s matches at old rva: %-5s   occurrences now: %d' % (name, here, n))
-    if not here:
-        print('       -> guard fails, feature disables itself (no bad read)')
-
+    ok('%s does not match on 3424 (feature disables itself)' % name, not here,
+       'matches again at the old rva! re-resolve it' if here else
+       'occurrences of the pattern elsewhere: %d' % n)
 print()
 print('RESULT: %s' % ('ALL OFFLINE CHECKS PASSED' if fails == 0 else '%d CHECK(S) FAILED' % fails))
 sys.exit(1 if fails else 0)
