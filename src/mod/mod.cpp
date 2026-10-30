@@ -829,7 +829,17 @@ DWORD WINAPI worker(LPVOID) {
         const bool loot_wanted = cfg.coop_guest_loot && !cfg.net_role_host;
         const bool relay_needed = cfg.coop_enemy_auto && !cfg.coop_suppress_lab;
         if (!loot_wanted) {
-            log::info("Config: shared loot (guest) {}", cfg.coop_guest_loot ? "off (this is the host)" : "off");
+            // Name WHICH of the two reasons applies. The old message read
+            // `guest_loot ? "off (this is the host)" : "off"`, which told a guest
+            // who had deliberately left guest_loot=0 nothing, and would have told
+            // a guest "this is the host" if the two ever disagreed. The role and
+            // the setting are separate facts; report the one that decided.
+            if (cfg.net_role_host) {
+                log::info("Config: shared loot off (this is the host; the enemies are already yours)");
+            } else {
+                log::info("Config: shared loot off ([coop] guest_loot=0; set it to 1 to receive "
+                          "your own drop when the host kills an enemy you helped with)");
+            }
         } else if (!relay_needed) {
             log::warn("Config: shared loot is ON but [coop] enemy_auto=0, so it can never fire: "
                       "the enemy relay is what tells the mod which creature a copy is. Set enemy_auto=1.");
