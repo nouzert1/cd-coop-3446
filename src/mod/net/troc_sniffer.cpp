@@ -239,6 +239,23 @@ OnRecvPacketFn g_on_recv_fn = nullptr;
 bool g_injection_enabled = false;
 thread_local bool t_injecting = false;
 
+// The opcodes this file matches against, resolved once at startup (see the check
+// in install()). A game patch renumbers opcodes without renaming the handlers, so
+// comparing against the header's frozen numbers silently stops matching; these
+// carry the values the running game actually uses.
+//
+// Initialised to the header's numbers so that anything running before resolution
+// -- and any build where resolution is unavailable -- behaves as it did before,
+// rather than matching nothing at all.
+uint16_t op_actor_load_ack = off::kOpActorLoadDataAck;
+uint16_t op_remove_actor_ack = off::kOpRemoveActorAck;
+uint16_t op_move_req = off::kOpMoveActorReq;
+uint16_t op_move_ack = off::kOpMoveActorAck;
+uint16_t op_start_action_req = off::kOpStartActionReq;
+uint16_t op_start_action_ack = off::kOpStartActionAck;
+uint16_t op_rotate_req = off::kOpRotateActorReq;
+uint16_t op_rotate_ack = off::kOpRotateActorAck;
+
 // SEH wrapper (no C++ objects): a malformed injected packet must not take the
 // game down from inside its own packet code.
 bool guarded_inject(void* net, void* session, uint64_t arg3, const uint8_t* pkt, uint16_t size) {
@@ -291,11 +308,14 @@ void on_recv_packet(safetyhook::Context& ctx) {
         t_injecting = false;
         const uint16_t op = static_cast<uint16_t>(pkt[0] | (pkt[1] << 8));
         if (ok) {
-            // Movement goes in at ~40 Hz; log only loads and removals.
-            if (op == off::kOpActorLoadDataAck || op == off::kOpRemoveActorAck) {
+            // Movement goes in at ~40 Hz; log only loads and removals. Compared
+            // against the RESOLVED opcodes: the header's numbers are only a
+            // fallback, and on a build that renumbered them a literal comparison
+            // would silently stop matching and these lines would never print.
+            if (op == op_actor_load_ack || op == op_remove_actor_ack) {
                 log::info("Inject: delivered opcode {} ({} bytes) to ClientNet::OnRecvPacket", op,
                           pkt.size());
-            } else if (op == off::kOpStartActionAck && pkt.size() >= 9) {
+            } else if (op == op_start_action_ack && pkt.size() >= 9) {
                 // The horse copy's actions (its first one matters: horse_diag).
                 uint32_t key = 0;
                 std::memcpy(&key, pkt.data() + 5, 4);
@@ -357,32 +377,6 @@ const std::string& name_for(uint16_t op) {
     static const std::string unknown = "?";
     auto it = g_name_by_opcode.find(op);
     return it == g_name_by_opcode.end() ? unknown : it->second;
-}
-
-// Opcode of a Troc handler, looked up by its RTTI class name. The table is built
-// once at startup from the live game, so this survives an opcode renumbering
-// between builds; `fallback` keeps the old behaviour when it cannot be resolved.
-uint16_t opcode_for(const char* name, uint16_t fallback) {
-    if (!name || !*name || g_name_by_opcode.empty()) return fallback;
-    // The map is name -> opcode indexed the other way, so walk it. It holds a few
-    // thousand entries and this is called at most a handful of times, but cache
-    // the answer per name to keep it off any hot path.
-    static std::mutex cache_mutex;
-    static std::map<std::string, uint16_t> cache;
-    std::lock_guard lock(cache_mutex);
-    if (const auto it = cache.find(name); it != cache.end()) return it->second;
-    uint16_t found = fallback;
-    for (const auto& [op, n] : g_name_by_opcode) {
-        if (n == name) {
-            found = op;
-            break;
-        }
-    }
-    cache.emplace(name, found);
-    if (found != fallback) {
-        log::info("Troc: {} is opcode {} this build (was {})", name, found, fallback);
-    }
-    return found;
 }
 
 bool opcodes_resolved() { return !g_name_by_opcode.empty(); }
@@ -588,6 +582,38 @@ bool head_matches(uintptr_t addr, const uint8_t* expected, size_t n) {
 
 }  // namespace
 
+// Opcode of a Troc handler, looked up by its RTTI class name. The table is built
+// once at startup from the live game, so this survives an opcode renumbering
+// between builds; `fallback` keeps the old behaviour when it cannot be resolved.
+//
+// Defined OUTSIDE the anonymous namespace on purpose. troc_sniffer.h declares it
+// as cdmp::net::opcode_for, and a definition inside the anonymous namespace makes
+// an unrelated internal function of the same name -- two equally good candidates
+// for every call, which the compiler rejects as ambiguous. It went unnoticed
+// because nothing inside the anonymous namespace called it before.
+uint16_t opcode_for(const char* name, uint16_t fallback) {
+    if (!name || !*name || g_name_by_opcode.empty()) return fallback;
+    // The map is name -> opcode indexed the other way, so walk it. It holds a few
+    // thousand entries and this is called at most a handful of times, but cache
+    // the answer per name to keep it off any hot path.
+    static std::mutex cache_mutex;
+    static std::map<std::string, uint16_t> cache;
+    std::lock_guard lock(cache_mutex);
+    if (const auto it = cache.find(name); it != cache.end()) return it->second;
+    uint16_t found = fallback;
+    for (const auto& [op, n] : g_name_by_opcode) {
+        if (n == name) {
+            found = op;
+            break;
+        }
+    }
+    cache.emplace(name, found);
+    if (found != fallback) {
+        log::info("Troc: {} is opcode {} this build (was {})", name, found, fallback);
+    }
+    return found;
+}
+
 bool sniffer_world_loading() { return world_loading(); }
 
 bool sniffer_inject_c2s(std::vector<uint8_t> packet) {
@@ -620,20 +646,65 @@ bool sniffer_install(const std::wstring& dir, HANDLE stop, bool record) {
     log::info("Sniffer: {} message types resolved from the game ({} opcodes)", g_trocs.size(),
               g_name_by_opcode.size());
 
-    // Injection relies on two opcodes; check them against the live table.
+    // Injection needs eight opcodes. Check them against the live table, and WHERE
+    // THEY DISAGREE, take the live value rather than the header's.
     g_on_recv_fn = reinterpret_cast<OnRecvPacketFn>(recv);
     g_post_fn = reinterpret_cast<PostPacketFn>(post);
-    const std::pair<uint16_t, const char*> expected[] = {
-        {off::kOpActorLoadDataAck, "ActorLoadDataAck"}, {off::kOpRemoveActorAck, "RemoveActorAck"},
-        {off::kOpMoveActorReq, "MoveActorReq"},         {off::kOpMoveActorAck, "MoveActorAck"},
-        {off::kOpStartActionReq, "StartActionReq"},     {off::kOpStartActionAck, "StartActionAck"},
-        {off::kOpRotateActorReq, "RotateActorReq"},     {off::kOpRotateActorAck, "RotateActorAck"},
-    };
+    //
+    // This check used to compare the header's frozen numbers against the table and
+    // disable injection on any mismatch -- fail-safe, but it also threw away the
+    // answer it had just computed. On 3446 seven of the eight opcodes were
+    // renumbered (RemoveActorAck 2516->3067, StartActionAck 2991->2552, ...), so
+    // injection switched itself off and the host captured nothing at all, while the
+    // log line "1175 message types resolved" right above suggested all was well.
+    //
+    // The table is built from the game's own RTTI names, which are stable across
+    // patches, so a name that is present is authoritative and a renumbering is a
+    // non-event. Only a name that is MISSING from the table is a real problem, and
+    // that still disables injection.
     g_injection_enabled = true;
-    for (const auto& [op, name] : expected) {
-        if (name_for(op) != name) {
-            log::warn("Sniffer: opcode {} is '{}' in this game, expected '{}'", op, name_for(op), name);
-            g_injection_enabled = false;
+    {
+        const std::pair<uint16_t, const char*> expected[] = {
+            {off::kOpActorLoadDataAck, "ActorLoadDataAck"}, {off::kOpRemoveActorAck, "RemoveActorAck"},
+            {off::kOpMoveActorReq, "MoveActorReq"},         {off::kOpMoveActorAck, "MoveActorAck"},
+            {off::kOpStartActionReq, "StartActionReq"},     {off::kOpStartActionAck, "StartActionAck"},
+            {off::kOpRotateActorReq, "RotateActorReq"},     {off::kOpRotateActorAck, "RotateActorAck"},
+        };
+        // `wanted`, not `name`: a local called `name` shadows the parameter of the
+        // same name in opcode_for, which makes the call below ambiguous.
+        for (const auto& [op, wanted] : expected) {
+            const std::string& live = name_for(op);
+            if (live == wanted) continue;             // header agrees with the game
+            if (live == "?") {                        // the opcode is not in the table
+                log::warn("Sniffer: {} is opcode {} in the header but no such opcode exists in this "
+                          "game; injection disabled", wanted, op);
+                g_injection_enabled = false;
+                continue;
+            }
+            // The opcode moved. Re-resolve it by name and carry on.
+            const uint16_t resolved = opcode_for(wanted, op);
+            if (resolved == op || name_for(resolved) != wanted) {
+                log::warn("Sniffer: {} was opcode {} but this game uses {} for '{}', and the name "
+                          "could not be re-resolved; injection disabled", wanted, op, resolved, live);
+                g_injection_enabled = false;
+            }
+        }
+        // Hand the resolved values to the rest of the mod. Everything downstream
+        // reads these, so this is the one place the renumbering has to be applied.
+        if (g_injection_enabled) {
+            op_move_req = opcode_for("MoveActorReq", off::kOpMoveActorReq);
+            op_start_action_req = opcode_for("StartActionReq", off::kOpStartActionReq);
+            op_rotate_req = opcode_for("RotateActorReq", off::kOpRotateActorReq);
+            op_actor_load_ack = opcode_for("ActorLoadDataAck", off::kOpActorLoadDataAck);
+            op_move_ack = opcode_for("MoveActorAck", off::kOpMoveActorAck);
+            op_start_action_ack = opcode_for("StartActionAck", off::kOpStartActionAck);
+            op_rotate_ack = opcode_for("RotateActorAck", off::kOpRotateActorAck);
+            op_remove_actor_ack = opcode_for("RemoveActorAck", off::kOpRemoveActorAck);
+            log::info("Sniffer: injection enabled on this build's opcodes "
+                      "(MoveActorReq {} StartActionReq {} RotateActorReq {} / MoveActorAck {} "
+                      "StartActionAck {} RotateActorAck {} RemoveActorAck {} ActorLoadDataAck {})",
+                      op_move_req, op_start_action_req, op_rotate_req, op_move_ack, op_start_action_ack,
+                      op_rotate_ack, op_remove_actor_ack, op_actor_load_ack);
         }
     }
     if (!g_injection_enabled) log::warn("Sniffer: opcode table mismatch, injection disabled");
