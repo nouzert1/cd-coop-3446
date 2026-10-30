@@ -38,10 +38,11 @@ Copy-Item $loader (Join-Path $kit 'dinput8.dll')
 # always match this build.
 $iniSrc = Join-Path $bin 'cdmp.ini'
 if (-not (Test-Path $iniSrc)) {
-    # No INI yet (the mod writes one on first run): generate it from config.cpp's
-    # defaults by running the unit tests, which do not need the game.
+    # No INI yet (the mod writes one on first game run). The fallback below has
+    # to carry EVERY key the test depends on, because a key that is absent is
+    # invisible: the player gets the default without knowing the choice existed.
     Write-Host 'No cdmp.ini in the build output; it is written on first game run.'
-    Write-Host 'Creating a minimal one with the room-code keys.'
+    Write-Host 'Creating the test INI, with every key this test uses.'
     @'
 [general]
 player_name=Player
@@ -62,7 +63,37 @@ code=
 enabled=1
 ; The panel speaks English or Spanish only ("en" | "es"); anything else = en.
 language=en
-'@ | Set-Content -Path (Join-Path $kit 'cdmp.ini') -Encoding UTF8
+
+[coop]
+; The main switch. 1 turns co-op on (the other player appears in your world).
+enabled=1
+; Playout delay in ms: how far behind you see the other player. Longer is
+; smoother but laggier. 300 is a sane starting point.
+delay_ms=300
+
+; BOSS SAFETY -- leave this at 1.
+; A boss fight here is a scripted scene that the HOST's game runs: it owns the
+; boss's phases, the cutscenes and the end of the fight. The boss only really
+; exists in the host's world, so if the GUEST lands the killing blow the boss
+; dies outside that script, the end-of-fight never fires, and the HOST'S QUEST
+; GETS STUCK behind the arena barrier.
+; 1 (default): you still do damage and still help, but the host lands the
+;              killing blow, bosses are not staggered, and nothing lands while
+;              the host is in a cutscene.
+; 0: old behaviour. Only with a save backup, and expect stuck quests.
+boss_safe=1
+
+; SHARED LOOT -- GUEST only, leave at 1 to test it.
+; When you help kill one of the host's enemies, your own world would normally
+; give you nothing, because that creature only exists in the host's world.
+; With this on, your server makes its own copy of that creature after the one
+; you helped kill goes down, kills it here, and lets you loot it normally -- so
+; each of you takes your own drop from the same kill, and your own quests and
+; XP are not affected.
+; It only fires for an enemy you actually helped kill, within 30 m of you.
+; Hosts can leave it at 0: the enemies are already theirs.
+guest_loot=1
+'@ | Set-Content -Path (Join-Path $kit 'cdmp.ini') -Encoding Unicode
 } else {
     Copy-Item $iniSrc (Join-Path $kit 'cdmp.ini')
 }
@@ -237,6 +268,22 @@ RULES
 '@ | Set-Content -Path (Join-Path $kit 'README.txt') -Encoding UTF8
 
 # --- checksums, so both sides can prove they have the same files ----------
+# The mod reads cdmp.ini with GetPrivateProfileStringW / GetPrivateProfileIntW,
+# which want UTF-16. An ASCII or UTF-8 INI does not fail loudly: the keys in it
+# are simply not found and every setting silently reverts to its default. That
+# would make a whole test session worthless, so check it before packing.
+$iniPath = Join-Path $kit 'cdmp.ini'
+$head = [System.IO.File]::ReadAllBytes($iniPath)
+if ($head.Length -lt 2 -or $head[0] -ne 0xFF -or $head[1] -ne 0xFE) {
+    throw ("cdmp.ini is not UTF-16 LE (first bytes: {0}). The mod reads it with the wide " +
+           "INI API, so every key would be silently ignored.") -f (($head[0..1]) -join ',')
+}
+# A setting the test depends on must actually be in the file we ship.
+$iniText = Get-Content $iniPath -Encoding Unicode -Raw
+foreach ($key in 'transport=steam', 'boss_safe=1', 'guest_loot=1') {
+    if ($iniText -notmatch [regex]::Escape($key)) { throw "cdmp.ini is missing '$key'" }
+}
+
 $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
     $h = (Get-FileHash (Join-Path $kit $f) -Algorithm SHA256).Hash
     '{0}  {1}' -f $h, $f
