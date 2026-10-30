@@ -23,6 +23,33 @@ if (Get-Process CrimsonDesert -ErrorAction SilentlyContinue) {
     Write-Warning 'The game is running; the build id is read from source so this is fine, but close it before deploying.'
 }
 
+# The binary must have been built from the commit that is checked out now.
+#
+# The build id is baked in at CMake configure time (CMakeLists.txt runs git
+# rev-parse through execute_process), so a .asi built before a later commit keeps
+# the OLDER id. The mod exchanges this id on connect and refuses to pair when the
+# two sides differ, so shipping a stale binary means both players get "Different
+# mod versions" while holding what looks like the same ZIP -- with nothing
+# pointing at the real cause.
+$idHeader = Join-Path $root 'build\generated\build_id.h'
+$head = (& git -C $root rev-parse --short=8 HEAD 2>$null)
+if ($LASTEXITCODE -ne 0 -or -not $head) {
+    Write-Warning 'Not a git repository: cannot check the build id against a commit.'
+} elseif (-not (Test-Path $idHeader)) {
+    Write-Warning "No $idHeader; cannot check the build id. Run scripts\build.ps1."
+} else {
+    $head = $head.Trim()
+    $m = Select-String -Path $idHeader -Pattern 'CDMP_BUILD_ID\s+0x([0-9a-fA-F]+)'
+    if (-not $m) { throw "Cannot read CDMP_BUILD_ID from $idHeader" }
+    $built = $m.Matches[0].Groups[1].Value.ToLower()
+    if ($built -ne $head) {
+        throw ("The built cdmp.asi is STALE: it carries build id 0x{0} but HEAD is {1}. " +
+               "Rebuild with scripts\build.ps1 before packing, or both players will see " +
+               "'Different mod versions' from the same ZIP.") -f $built, $head
+    }
+    Write-Host "Build id matches HEAD ($head)."
+}
+
 # Start clean so a stale file can never end up in the ZIP.
 if (Test-Path $kit) { Remove-Item $kit -Recurse -Force }
 New-Item -ItemType Directory -Path $kit -Force | Out-Null
