@@ -204,6 +204,14 @@ void run_network(const Config& cfg, LocalSource& local) {
     bool room_code_pending = false;
     std::string room_code_text;
     bool room_failed_logged = false;
+    // The host's lobby creation is retried in the loop for the same reason: this
+    // point in startup is reached BEFORE the save finishes loading (the mod loads
+    // as winmm.dll, long before WorldSystem exists), so a single attempt here
+    // happens against a world that is not there yet and is then never repeated.
+    // Observed live: the attempt fired at 16:06:52 and the player only entered the
+    // world at 16:08:17, 85 s later, so no lobby was ever created and the panel
+    // never showed a room code -- with the log looking otherwise healthy.
+    bool room_host_pending = false;
     if (cfg.net_transport_steam) {
         if (!local.in_game()) {
             log::error("The Steam transport only works inside the game");
@@ -218,12 +226,29 @@ void run_network(const Config& cfg, LocalSource& local) {
         // host's SteamID64 from it. If anything fails, the old paths
         // (peer_steamid, then the "only friend playing" scan) still work.
         if (cfg.room_code.empty()) {
-            if (host && net::room_available()) {
+            if (host) {
+                // One attempt now, and the loop retries if it does not take.
+                //
+                // room_available() is NOT used as a gate here any more. It was, and
+                // that is why the retry added earlier never fired: room_available()
+                // resolves the Steam flat API and latches g_disabled when
+                // steam_api64.dll is not loaded YET -- which it is not this early,
+                // because the mod loads as winmm.dll before the game's Steam
+                // initialisation. The gate was therefore false, the whole block was
+                // skipped, room_host_pending never became true, and the retry in the
+                // loop had nothing to retry. The log showed no Room line at all,
+                // which is exactly what a silently-skipped block looks like.
+                //
+                // room_host_open() already calls room_available() and returns an
+                // empty string when it is not ready, so calling it unconditionally is
+                // both safe and the only way the retry can be armed.
                 const std::string code = net::room_host_open();
                 if (!code.empty()) {
                     log::info("Room: your code is {} -- send it to your friend", code);
                 } else {
-                    log::warn("Room: could not host a room; the guest will need [steam] peer_steamid");
+                    room_host_pending = true;
+                    log::info("Room: not ready to host yet (Steam or the world is still coming up); "
+                              "will keep trying");
                 }
             }
         } else {
@@ -295,6 +320,8 @@ void run_network(const Config& cfg, LocalSource& local) {
     const uint32_t state_interval = 1000 / cfg.send_rate_hz;
     uint32_t last_state = 0;
     uint32_t last_report = now_ms();
+    uint32_t last_room_attempt = 0;  // host lobby retry, see the loop below
+    int room_attempts = 0;           // how many retries have failed, for the log
     // Ctrl+F12 writes a numbered mark in the log: both players press it at the
     // same moment ("now!") so their logs can be lined up afterwards.
     bool mark_was_down = false;
@@ -303,6 +330,33 @@ void run_network(const Config& cfg, LocalSource& local) {
 
     while (!stop_requested()) {
         transport->poll(now_ms());
+
+        // The host's lobby, retried until it takes. Startup runs before the save is
+        // loaded, so the first attempt reliably fails on a cold start; without this
+        // the host never gets a room code at all and the guest has nothing to type.
+        //
+        // Gated on in_game() and spaced 5 s apart because the attempt BLOCKS: Steam
+        // lobby creation is asynchronous and wait_call polls it for up to 10 s per
+        // call. This runs on the mod's own thread, so the game does not stall, but a
+        // failing attempt still costs the loop that long -- retrying every tick
+        // would starve the state sync that shares it. Once in the world the first
+        // attempt succeeds, so this normally costs one call.
+        if (room_host_pending && steam && steam->ready() && local.in_game() &&
+            now_ms() - last_room_attempt >= 5000) {
+            last_room_attempt = now_ms();
+            const std::string code = net::room_host_open();
+            if (!code.empty()) {
+                room_host_pending = false;
+                log::info("Room: your code is {} -- send it to your friend", code);
+            } else if (room_attempts++ < 3) {
+                // Say WHY on the first few failures. The previous version retried
+                // silently, so a retry that never succeeded was indistinguishable
+                // from a retry that never ran -- which is exactly the dead end this
+                // took two rounds to get out of.
+                log::info("Room: attempt {} did not produce a code; {}", room_attempts,
+                          net::room_status());
+            }
+        }
 
         // Steam guest without a configured host: the only friend playing.
         if (steam && !host && !peer && steam->ready() && now_ms() - last_friend_scan >= 2000) {
@@ -410,7 +464,9 @@ void run_network(const Config& cfg, LocalSource& local) {
                 hud.boss_cutscene = b.cutscene;
             }
             // The room code, so the host can read it out and the guest sees
-            // what they are joining.
+            // what they are joining. When there is no code, carry the reason as
+            // well: the panel shows it in place of the code, so a missing code is
+            // visible on screen rather than only in cdmp.log.
             if (!room_code_text.empty()) {
                 hud.room_code = room_code_text;
                 hud.room_hosting = false;
@@ -418,6 +474,7 @@ void run_network(const Config& cfg, LocalSource& local) {
                 hud.room_code = net::room_current_code();
                 hud.room_hosting = true;
             }
+            if (hud.room_code.empty()) hud.room_status = net::room_status();
             render::hud_update(std::move(hud));
         }
 

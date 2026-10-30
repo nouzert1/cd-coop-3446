@@ -24,6 +24,11 @@ struct HudData {
     // we are looking for (the guest typed it). Empty when room codes are unused.
     std::string room_code;
     bool room_hosting = false;
+    // Why there is no code, when there is none: room_code.cpp's own status text
+    // (e.g. "room: ready", "room: waiting for steam_api64.dll"). Shown in the panel
+    // where the code would be, so a missing code explains itself on screen instead
+    // of only in the log.
+    std::string room_status;
     // Boss fight (boss_safe.h): the stage boss's health, read from the relayed
     // copy. The guest has no native boss bar -- the stage that draws it exists
     // only in the host's world -- so we draw our own.

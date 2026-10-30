@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cstddef>
 #include <mutex>
 
 #include "mod/log.h"
@@ -25,11 +26,27 @@ inline constexpr const char* kHostKey = "host";
 inline constexpr int kCallResultTimeoutMs = 10000;
 
 // LobbyCreated_t { EResult result; CSteamID lobby; } (pack 8).
+//
+// The layout is proven, not assumed: GetAPICallResult copies exactly the byte
+// count we hand it, so a struct that is even 4 bytes off would fill `out` with a
+// shifted view of the result. steam_transport.cpp asserts its structs the same
+// way. On a 64-bit build the natural alignment already gives 16, so the padding
+// member is explicit to keep the intent visible rather than incidental.
 struct LobbyCreated {
     int32_t result;   // EResult, 1 = k_EResultOK
-    int32_t pad_;
+    int32_t pad_;     // explicit: CSteamID needs 8-byte alignment
     CSteamID lobby;
 };
+static_assert(sizeof(LobbyCreated) == 16);
+static_assert(offsetof(LobbyCreated, lobby) == 8);
+
+// k_iCallback for LobbyCreated_t: the id Steam tags the result with, needed so
+// GetAPICallResult can refuse a result of the wrong type. Taken from the SDK's own
+// generated constants, not guessed:
+//   k_iSteamMatchmakingCallbacks = 500
+//   LobbyCreated_t = k_iSteamMatchmakingCallbacks + 13  ->  513
+// (LobbyEnter_t is +4 in the same family, should the guest path ever need one.)
+constexpr int kLobbyCreatedCallback = 500 + 13;
 
 struct Api {
     void* (*matchmaking)() = nullptr;  // SteamAPI_SteamMatchmaking_v009
@@ -44,7 +61,21 @@ struct Api {
     // The mod has no callback pump of its own: the result of an async call is
     // polled. (There is no SteamAPI_SteamAPI_GetCallResult export.)
     bool (*is_call_completed)(void*, SteamAPICall_t, bool*) = nullptr;
-    bool (*get_call_result)(void*, SteamAPICall_t, void*, int, bool*) = nullptr;
+    // FIVE parameters after `this`, not four. The public SDK declares:
+    //   bool GetAPICallResult( HSteamAPICall hSteamAPICall, void* pCallback,
+    //                          int cubCallback, int iCallbackExpected,
+    //                          bool* pbFailed );
+    // so the x64 call is rcx=this rdx=call r8=pCallback r9=cubCallback, and
+    // iCallbackExpected + pbFailed land on the stack. The previous declaration
+    // dropped iCallbackExpected, which shifted every later argument by one slot:
+    // cubCallback was passed where iCallbackExpected belongs, and pbFailed was
+    // read off the stack as garbage. `*pbFailed` then came back true at random and
+    // the caller reported "CreateLobby result could not be read" -- a read that was
+    // actually fine, rejected by a flag that was never really written.
+    //
+    // k_iCallback for LobbyCreated_t is 513 (see the static_assert below); passing
+    // the real value also lets Steam itself reject a result of the wrong type.
+    bool (*get_call_result)(void*, SteamAPICall_t, void*, int, int, bool*) = nullptr;
     uint64_t (*get_steam_id)(void*) = nullptr;
 
     void* mm = nullptr;
@@ -54,7 +85,9 @@ struct Api {
 Api g_api;
 bool g_resolved = false;
 bool g_disabled = false;
-std::once_flag g_once;
+// Guards the API lookup in resolve(). A plain mutex, not std::once_flag: the lookup
+// has to be retryable, because it runs before the game has loaded steam_api64.dll.
+std::mutex g_resolve_mutex;
 
 std::mutex g_mutex;
 uint64_t g_lobby = 0;
@@ -89,13 +122,26 @@ void fail(const char* what) {
 }
 
 void resolve() {
-    std::call_once(g_once, [] {
+    // NOT std::call_once. The flat API is looked up through steam_api64.dll, which
+    // is NOT loaded yet when the mod starts -- the mod loads as winmm.dll, well
+    // before the game's Steam initialisation. call_once latches the FIRST outcome
+    // forever, so an early call recorded g_disabled = true permanently and no later
+    // attempt could ever succeed, no matter how long the player waited.
+    //
+    // Resolving again on a later call is cheap (a handful of GetProcAddress) and is
+    // the only way a retry can work. It is done once normally, because the first
+    // call that sees the DLL succeed sets g_resolved and every later call returns
+    // immediately.
+    std::lock_guard lock(g_resolve_mutex);
+    if (g_resolved) return;
+    {
         // steam_api64.dll is already loaded: the game links it. Never load a
         // second copy (steam_transport.cpp does the same).
         HMODULE dll = GetModuleHandleW(L"steam_api64.dll");
         if (!dll) {
-            g_disabled = true;
-            g_status = "room: steam_api64.dll not loaded";
+            // Transient, not fatal: the DLL appears once the game brings Steam up.
+            // Do NOT latch g_disabled here -- that is what made the retry useless.
+            g_status = "room: waiting for steam_api64.dll";
             return;
         }
         Api& a = g_api;
@@ -119,26 +165,35 @@ void resolve() {
         get(a.is_call_completed, "SteamAPI_ISteamUtils_IsAPICallCompleted");
         get(a.get_call_result, "SteamAPI_ISteamUtils_GetAPICallResult");
         get(a.get_steam_id, "SteamAPI_ISteamUser_GetSteamID");
+        // The exports are missing only when the DLL is the wrong version; that IS
+        // permanent, so disabling here is right.
         if (missing) {
             log::warn("Room: {} matchmaking exports missing; room codes unavailable", missing);
             g_disabled = true;
             g_status = "room: matchmaking API unavailable";
             return;
         }
+        // But the INTERFACES can be null simply because Steam has not finished
+        // initialising, which is transient and must not latch. Leave g_disabled
+        // alone and let the next attempt try again.
         if (!call(a.mm, a.matchmaking) || !a.mm || !call(a.utl, a.utils) || !a.utl) {
-            g_disabled = true;
-            g_status = "room: matchmaking interface unavailable";
+            g_status = "room: waiting for the Steam matchmaking interface";
             return;
         }
         g_resolved = true;
         g_status = "room: ready";
         log::info("Room: Steam matchmaking resolved");
-    });
+    }
 }
 
 // Waits for an async Steam call by polling the game's own callback queue.
+//
+// `callback_id` is the k_iCallback of the EXPECTED result type (513 for
+// LobbyCreated_t). It is passed through to GetAPICallResult, which uses it to
+// verify the pending result really is of that type before copying it into `out`.
+// Passing it is not optional: see the note on the function-pointer declaration.
 template <class T>
-bool wait_call(SteamAPICall_t h, T& out, const char* what) {
+bool wait_call(SteamAPICall_t h, T& out, int callback_id, const char* what) {
     if (h == 0) return false;
     const uint32_t start = GetTickCount();
     while (GetTickCount() - start < static_cast<uint32_t>(kCallResultTimeoutMs)) {
@@ -155,7 +210,7 @@ bool wait_call(SteamAPICall_t h, T& out, const char* what) {
             std::memset(&out, 0, sizeof out);
             bool io_failed = false;
             if (!call(io_failed, g_api.get_call_result, g_api.utl, h, &out,
-                      static_cast<int>(sizeof(T)), &failed) ||
+                      static_cast<int>(sizeof(T)), callback_id, &failed) ||
                 failed) {
                 log::warn("Room: {} result could not be read", what);
                 return false;
@@ -188,7 +243,7 @@ std::string room_host_open() {
         return fail("CreateLobby"), std::string{};
     }
     LobbyCreated created{};
-    if (!wait_call(h, created, "CreateLobby")) return {};
+    if (!wait_call(h, created, kLobbyCreatedCallback, "CreateLobby")) return {};
     if (created.result != 1 || created.lobby == 0) {
         log::warn("Room: lobby creation failed (EResult {})", created.result);
         return {};

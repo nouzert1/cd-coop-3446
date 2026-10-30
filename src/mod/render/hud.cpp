@@ -141,17 +141,6 @@ void hud_draw(float width, float height) {
                                en ? "Host cutscene: wait" : "Cinematica del anfitrion: espera");
         }
     }
-    if (!d.room_code.empty()) {
-        // The host reads this out; the guest sees what they typed.
-        if (d.room_hosting) {
-            ImGui::TextColored(ImVec4(0.4f, 1, 0.5f, 1),
-                               en ? "Room code: %s   (tell your friend)" : "Codigo de sala: %s   (diselo a tu amigo)",
-                               d.room_code.c_str());
-        } else {
-            ImGui::Text(en ? "Room code: %s   (joining...)" : "Codigo de sala: %s   (entrando...)",
-                        d.room_code.c_str());
-        }
-    }
     if (!d.peer_problem.empty()) {
         // In English from the session; the essential part is the instruction.
         ImGui::TextColored(ImVec4(1, 0.35f, 0.3f, 1), en ? "Different mod versions: both of you update"
@@ -172,6 +161,34 @@ void hud_draw(float width, float height) {
     }
     if (!d.enemy_zone.empty()) ImGui::TextColored(ImVec4(0.75f, 0.85f, 1, 1), "%s", d.enemy_zone.c_str());
     if (!cam) ImGui::TextDisabled(en ? "Camera: %s" : "Cámara: %s", camera.last_failure().c_str());
+
+    // The room code, ALWAYS shown -- with the code when we have one, and an explicit
+    // "no code" plus the reason when we do not.
+    //
+    // It used to be drawn only when a code existed, which made two very different
+    // situations look identical from the player's side: "the mod has not managed to
+    // open a room yet" and "the mod is not even trying" both rendered as nothing at
+    // all. That cost several rounds of testing whose only visible symptom was an
+    // absent line. A line that is always present, and says which case it is, turns
+    // the panel into the diagnostic it should have been from the start.
+    ImGui::TextColored(ImVec4(0.55f, 0.75f, 1, 1), en ? "Room code:" : "Codigo de sala:");
+    ImGui::SameLine();
+    if (!d.room_code.empty()) {
+        // The host reads this out; the guest sees what they typed.
+        if (d.room_hosting) {
+            ImGui::TextColored(ImVec4(0.4f, 1, 0.5f, 1), "%s   %s", d.room_code.c_str(),
+                               en ? "(tell your friend)" : "(diselo a tu amigo)");
+        } else {
+            ImGui::Text("%s   %s", d.room_code.c_str(), en ? "(joining...)" : "(entrando...)");
+        }
+    } else if (d.room_status.empty()) {
+        ImGui::TextDisabled(en ? "(no code)" : "(sin codigo)");
+    } else {
+        // Say WHY, in the place the code would be, using the room module's own status
+        // text -- so the panel and cdmp.log agree instead of the player having to go
+        // read a file to find out what went wrong.
+        ImGui::TextDisabled(en ? "(no code: %s)" : "(sin codigo: %s)", d.room_status.c_str());
+    }
     ImGui::End();
 
     // ---- world markers
