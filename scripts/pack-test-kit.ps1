@@ -208,6 +208,51 @@ If it does not connect, send me cdmp.log from bin64 - it says
 exactly which step failed.
 
 
+WHAT IS ALREADY TURNED ON
+-------------------------
+You do not need to edit anything else. The kit arrives with
+these on, and the panel (F8) and cdmp.log will tell you if any
+of them is not:
+
+  * Shared loot (GUEST). Help the host kill one of their
+    creatures and you get YOUR OWN drop from it, in your own
+    world, without touching your quests or XP. You have to
+    actually hit the creature - one you never touched gives you
+    nothing, on purpose. It works within 30 m of you.
+    What to look for: kill something together, then loot the
+    corpse that appears on your side.
+
+  * Boss safety (BOTH). Bosses here are scripted fights that the
+    HOST's game runs. If you (guest) land the killing blow, the
+    fight ends outside that script and the HOST'S QUEST GETS
+    STUCK. So with this on you still do damage and still help,
+    but the host lands the killing blow, and nothing lands while
+    the host is in a cutscene. If the panel says the host is in
+    a cutscene, just wait.
+    What to look for: fight a world boss together and check that
+    the host's quest completes normally afterwards.
+
+  * A boss health bar in your panel, because the guest's game has
+    no boss bar of its own (that belongs to the host's script).
+
+WHAT IS NOT READY YET
+---------------------
+Joint bosses are only half there, and I would rather say so than
+let you find out the confusing way:
+
+  * You SEE the boss and you HURT it, and the host's quest is
+    safe.
+  * But YOUR OWN quest is NOT advanced by the kill, and the boss
+    does not drop loot for you. Your world never had that boss in
+    it. Making both worlds run their own copy of the fight is a
+    much bigger job and it is not done. This is the same
+    limitation Genshin-style co-op has, for the same reason.
+
+So: huge help in the fight, no credit for it yet. Please do test
+it and tell me what the panel and the log say - that is exactly
+the information I need.
+
+
 RULES WHILE TESTING (please follow these)
 -----------------------------------------
 - Nobody saves while the other player is in their world.
@@ -280,6 +325,28 @@ GUEST (visiting):
   Save, start the game, load your save. Wait up to a minute.
 
 Not connecting? Send me cdmp.log - it names the failing step.
+
+
+ALREADY TURNED ON (no editing needed)
+-------------------------------------
+  * Shared loot (GUEST): help kill one of the host's creatures
+    and you get your own drop from it, in your own world, without
+    touching your quests or XP. You must actually hit it - a
+    creature you never touched gives nothing, on purpose.
+  * Boss safety (BOTH): bosses here are scripted fights the HOST
+    runs. If the guest lands the killing blow, the fight ends
+    outside that script and the HOST'S QUEST STICKS. You still do
+    damage and still help, but the host kills it, and nothing
+    lands during the host's cutscenes.
+  * A boss health bar in the panel: the guest's game has none.
+
+NOT READY YET
+-------------
+Joint bosses are half there: you see the boss and you hurt it,
+and the host's quest is safe - but YOUR quest is not advanced and
+the boss drops nothing for you, because your world never had that
+boss. Making both worlds run their own copy of the fight is a much
+bigger job and is not done.
 
 
 RULES
