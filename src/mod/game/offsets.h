@@ -67,6 +67,12 @@ inline constexpr uintptr_t kStaticPlayerPos = 0x71BDC10;  // 2976:0x6D77858 (vmo
 // slot costs the feature, not the session. Code addresses (functions and
 // vtables) do NOT follow this delta and are marked separately.
 inline constexpr uintptr_t kClientClock = 0x1416B80;  // TODO(port): code, not data
+// Still the 2976 address: it cannot be resolved offline. Its head embeds a
+// RIP-relative displacement that changes every build, so the 2976 bytes match
+// nothing here (0 occurrences in the image), and re-matching by shape is no
+// better -- "cmp byte [rip+d],0 / jne +0x17" occurs 9 times. game_clock.cpp
+// compares this head against live memory and switches time sync off when it does
+// not match, which is what happens on 3424 today.
 inline constexpr uint8_t kClientClockHead[] = {0x80, 0x3D, 0xAE, 0x61, 0x87, 0x05, 0x00, 0x75, 0x17};
 inline constexpr uintptr_t kClientFrameClockMs = 0x70D2628;  // INFERRED 2976:0x6C8CD68
 inline constexpr uintptr_t kClientFrameClockUs = 0x70D2630;  // INFERRED 2976:0x6C8CD70
