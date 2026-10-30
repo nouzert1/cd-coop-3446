@@ -71,3 +71,51 @@ exe+0x71B1A40: 0x3470C44E100
 exe+0x70CDEA8: 0x346F1725000
 exe+0x71C0C20: 0x0
 exe+0x719DC8B: 0x0
+
+## TROC HANDLER RANGE on 3446 (measured by running the mod's own walk)
+
+# probe troc exe+6E00000 exe+6F80000
+#   -> 1175 handlers, first 0x6E82D10, last 0x6EB6370, span 0x33660
+# probe troc exe+6E00000 exe+6E82D10   -> 0 handlers   (nothing below)
+# probe troc exe+6EB6370 exe+6F80000   -> 1 handler    (the last one)
+#
+#   kTrocInstancesBegin = 0x6E82D10
+#   kTrocInstancesEnd   = 0x6EB6378   (last + 8)
+#   span 0x33668
+#
+# The 3424 values (0x6E973A0 .. 0x6EC8540) are NOT merely shifted: begin sits
+# 0x14690 bytes INSIDE the real range. Using them would silently skip every
+# handler from 0x6E82D10 to 0x6E973A0, which includes TrocTrStartActionAck and
+# the PostProcessAttackResult family -- the messages co-op depends on to relay
+# combat. A silently short range is worse than a wrong address, because the walk
+# still "works" and just finds fewer types. This is why the range is now measured
+# with the mod's own walk rather than carried over.
+#
+# Both edges were confirmed by running the walk on the discard side of each:
+# zero handlers below the first, zero above the last.
+
+first few (in order):
+  exe+0x6E82D10  .?AVTrocTrStartActionAck@pa@@
+  exe+0x6E82DA0  .?AVTrocTrStartSpawnActionAck@pa@@
+  exe+0x6E82E30  .?AVTrocTrStartActionNak@pa@@
+  exe+0x6E82EC0  .?AVTrocTrCatchActionResultAck@pa@@
+  exe+0x6E82F50  .?AVTrocTrCatchNak@pa@@
+  exe+0x6E82FE0  .?AVTrocTrPostProcessAttackResult_AttackerAck@pa@@
+last:
+  exe+0x6EB6370  .?AVTrocTrOnLogoutXxxToServerReq@pa@@
+  exe+0x6E82D10      rva 0x6E82D10  .?AVTrocTrStartActionAck@pa@@
+  exe+0x6E82DA0      rva 0x6E82DA0  .?AVTrocTrStartSpawnActionAck@pa@@
+  exe+0x6E82E30      rva 0x6E82E30  .?AVTrocTrStartActionNak@pa@@
+  exe+0x6E82EC0      rva 0x6E82EC0  .?AVTrocTrCatchActionResultAck@pa@@
+  exe+0x6E82F50      rva 0x6E82F50  .?AVTrocTrCatchNak@pa@@
+  exe+0x6E82FE0      rva 0x6E82FE0  .?AVTrocTrPostProcessAttackResult_AttackerAck@pa@@
+34 TrocTr handler(s) in [exe+0x6E82000, exe+0x6E84000)
+first rva 0x6E82D10   last rva 0x6E83FA0   span 0x1290
+  exe+0x6EB6010      rva 0x6EB6010  .?AVTrocTrAutoCreateItemRepeatTimer@pa@@
+  exe+0x6EB60A0      rva 0x6EB60A0  .?AVTrocTrUpdateRegenerateServerStatRepeatTimer@pa@@
+  exe+0x6EB6130      rva 0x6EB6130  .?AVTrocTrCheckChangeAnimationSpeedRepeatTimer@pa@@
+  exe+0x6EB61C0      rva 0x6EB61C0  .?AVTrocTrUpdateFieldNightAndDay@pa@@
+  exe+0x6EB6250      rva 0x6EB6250  .?AVTrocTrUpdateFieldGimmickSaveDataToResetRepeatTimer@pa@@
+  exe+0x6EB62E0      rva 0x6EB62E0  .?AVTrocTrLogoutSessionToServerReq@pa@@
+7 TrocTr handler(s) in [exe+0x6EB6000, exe+0x6EBA000)
+first rva 0x6EB6010   last rva 0x6EB6370   span 0x360

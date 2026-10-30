@@ -58,7 +58,8 @@ void usage() {
         "  rtti <addr>                          class name of the object at addr\n"
         "  classes <text> [--max N]             RTTI class names containing text\n"
         "  vtables <.?AVName@@>                 vtable address(es) of an RTTI class\n"
-        "  findptr <value> [--max N] [--heap]   where is this qword stored?\n");
+        "  findptr <value> [--max N] [--heap]   where is this qword stored?\n"
+        "  troc [begin] [end] [--max N]         run the mod's Troc handler walk\n");
 }
 
 // ---------------------------------------------------------------- arguments
@@ -598,7 +599,28 @@ int cmd_xrefs(const Process& p, const Args& a) {
     return 0;
 }
 
-int cmd_rtti(const Process& p, const Args& a) {    if (a.pos.size() < 2) return usage(), 2;
+// Mirrors the mod's game::rtti_name_of_vtable (rtti.cpp:11) exactly, because a
+// walk that uses a slightly different rule can report hits the mod will never see.
+// The mod asks for the CompleteObjectLocator at vtable-8, checks its signature is
+// 1, reads the TypeDescriptor RVA at COL+0x0C, and reads the name at
+// image_base + rva + 0x10.
+std::string rtti_name_of_vtable(const Process& p, uint64_t vtable) {
+    if (vtable < 8) return {};
+    const uint64_t base = p.module_base();
+    auto col = p.read<uint64_t>(vtable - 8);
+    if (!col) return {};
+    auto signature = p.read<uint32_t>(*col);
+    auto td_rva = p.read<uint32_t>(*col + 0x0C);
+    if (!signature || !td_rva || *signature != 1) return {};
+    char name[160] = {};
+    if (!p.read(base + *td_rva + 0x10, name, sizeof name - 1)) return {};
+    if (std::strncmp(name, ".?A", 3) != 0) return {};
+    return name;
+}
+
+
+int cmd_rtti(const Process& p, const Args& a) {
+    if (a.pos.size() < 2) return usage(), 2;
     auto addr = parse_addr(p, a.pos[1]);
     if (!addr) return std::puts("Bad address"), 2;
     const std::string cls = p.rtti_name(*addr);
@@ -678,6 +700,61 @@ int cmd_findptr(const Process& p, const Args& a) {
     return 0;
 }
 
+// Replicates the mod's own Troc walk (troc_sniffer.cpp:load_troc_names) so a range
+// can be checked against the live game instead of guessed. The walk is: for every
+// qword in [begin,end), dereference it as a vtable pointer, ask for that vtable's
+// RTTI name, and keep it when the name starts with ".?AVTrocTr".
+//
+// This runs entirely in one process, which matters: the same sweep through one
+// `probe read` call per address takes minutes and is unusable interactively.
+//
+// It prints the first and last hit so the caller can tighten the range. A range
+// that is too narrow silently loses message types, and the mod needs them to name
+// opcodes, so an undersized range is a real defect rather than a cosmetic one.
+int cmd_troc(const Process& p, const Args& a) {
+    const uint64_t begin = a.pos.size() > 1 ? (parse_addr(p, a.pos[1]).value_or(0))
+                                            : p.module_base() + 0x6E00000;
+    const uint64_t end = a.pos.size() > 2 ? (parse_addr(p, a.pos[2]).value_or(0))
+                                          : p.module_base() + 0x6F80000;
+    if (!begin || !end || end <= begin) return std::puts("Bad range"), 2;
+    const size_t max = parse_count(a.get("--max", "40"), 40);
+
+    constexpr size_t kChunk = 4 * 1024 * 1024;
+    std::vector<uint8_t> buf;
+    size_t hits = 0;
+    uint64_t first = 0, last = 0;
+    for (uint64_t start = begin; start + 8 <= end; start += kChunk) {
+        const size_t want = static_cast<size_t>(std::min<uint64_t>(kChunk, end - start));
+        buf.resize(want);
+        if (!p.read(start, buf.data(), want)) continue;
+        for (size_t i = 0; i + 8 <= want; i += 8) {
+            uint64_t vt = 0;
+            std::memcpy(&vt, buf.data() + i, sizeof vt);
+            if (vt < p.module_base() || vt >= p.module_base() + 0x10000000) continue;
+            const std::string name = rtti_name_of_vtable(p, vt);
+            if (name.rfind(".?AVTrocTr", 0) != 0) continue;
+            const uint64_t site = start + i;
+            if (hits == 0) first = site;
+            last = site;
+            if (hits < max) {
+                std::printf("  %-18s rva 0x%llX  %s\n", p.describe(site).c_str(),
+                            static_cast<unsigned long long>(site - p.module_base()),
+                            name.c_str());
+            }
+            ++hits;
+        }
+    }
+    std::printf("%zu TrocTr handler(s) in [%s, %s)\n", hits,
+                p.describe(begin).c_str(), p.describe(end).c_str());
+    if (hits) {
+        std::printf("first rva 0x%llX   last rva 0x%llX   span 0x%llX\n",
+                    static_cast<unsigned long long>(first - p.module_base()),
+                    static_cast<unsigned long long>(last - p.module_base()),
+                    static_cast<unsigned long long>(last - first));
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -732,6 +809,7 @@ int main(int argc, char** argv) {
     if (cmd == "classes") return cmd_classes(p, a);
     if (cmd == "vtables") return cmd_vtables(p, a);
     if (cmd == "findptr") return cmd_findptr(p, a);
+    if (cmd == "troc") return cmd_troc(p, a);
     usage();
     return 2;
 }
