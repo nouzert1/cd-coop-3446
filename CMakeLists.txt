@@ -153,3 +153,11 @@ cdmp_strict(cdmp_tests)
 # header-only, Windows-free piece of src/mod/net and is tested through it.
 target_link_libraries(cdmp_tests PRIVATE cdmp_common)
 add_test(NAME unit COMMAND cdmp_tests)
+
+# Exhaustive room-codec check: proves the code is injective and reversible over
+# the lobby-id range Steam actually allocates from, which no reasonable unit test
+# can do inline (20 million ids). Run on demand, not as part of the unit suite.
+add_executable(cdmp_roomcodec_check tools/roomcodec_check.cpp)
+cdmp_strict(cdmp_roomcodec_check)
+target_link_libraries(cdmp_roomcodec_check PRIVATE cdmp_common)
+add_test(NAME roomcodec COMMAND cdmp_roomcodec_check)
