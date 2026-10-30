@@ -788,6 +788,14 @@ DWORD WINAPI worker(LPVOID) {
                   cfg.coop_offset_m, cfg.coop_horse, cfg.coop_equip, cfg.coop_damage, cfg.coop_map_pin,
                   cfg.coop_minimap_icon, cfg.coop_enemies_target_copy, cfg.coop_guest_hits, cfg.coop_guest_hit_stagger,
                   cfg.coop_player_hit_react, cfg.coop_player_hit_lethal);
+        // Say what the room code will do, so a host can tell from the log alone
+        // whether the mod is creating a room or looking one up.
+        log::info("Config: room code '{}' -- {}", cfg.room_code,
+                  cfg.room_code.empty()
+                      ? (cfg.net_role_host ? "host: the mod will create a room and show the code"
+                                           : "guest: none set; will fall back to [steam] peer_steamid")
+                      : (cfg.net_role_host ? "host: unused, the mod creates the room itself"
+                                           : "guest: will look this room up"));
         log::info("Config: dev clone {} combat {} minimap cycle {} aggro {} enemy relay {} piece4 {} | sniffer {} "
                   "record {} | overlay {}",
                   cfg.dev_clone_hotkeys, cfg.dev_combat_tests, cfg.dev_minimap_cycle, cfg.dev_aggro_test,
@@ -802,15 +810,18 @@ DWORD WINAPI worker(LPVOID) {
                   cfg.coop_suppress_radius_m, cfg.coop_suppress_off_m, cfg.coop_suppress_restore,
                   cfg.coop_suppress_restore_state, cfg.coop_suppress_wait_fight_s, cfg.coop_suppress_node_events,
                   cfg.coop_suppress_lab, cfg.coop_suppress_lab_radius_m);
+        // Boss safety (boss_safe.h): applied whether or not co-op is on, because
+        // the guard has to be in place BEFORE the first boss fight, and the
+        // default (on) is what protects the host's quest. A guest's lethal blow
+        // on a stage boss kills it outside the host's script, which leaves the
+        // host's quest stuck behind the arena barrier.
+        net::boss_set_safe_mode(cfg.coop_boss_safe);
+        log::info("Config: boss safety {}", cfg.coop_boss_safe ? "ON (the host lands the killing blow)" : "OFF");
         if (in_game && cfg.coop_enabled) {
             net::enemy_set_auto(cfg.coop_enemy_auto && !cfg.coop_suppress_lab);
             net::guest_hits_set_finish_arrow(cfg.coop_finish_arrow);
             net::puppet_set_rope_lookup(cfg.dev_rope_piece_lookup);
             net::loot_set_enabled(cfg.coop_guest_loot && !cfg.net_role_host);
-    // Boss safety (boss_safe.h): on by default. A guest's lethal blow on a stage
-    // boss kills it outside the host's script, which leaves the host's quest
-    // stuck; this keeps the killing blow with the host.
-    net::boss_set_safe_mode(cfg.coop_boss_safe);
             net::puppet_minimap_set_enemy_offset(cfg.coop_enemy_minimap_icon);
             net::puppet_want_rope_bend(cfg.dev_rope_bend);
             net::time_sync_set_mode(static_cast<net::TimeSyncMode>(cfg.coop_time_sync));
