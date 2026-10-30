@@ -184,6 +184,20 @@ HOW TO INSTALL
    If you see nothing, check that a file called cdmp.log appeared
    in bin64 and send it to me.
 
+   DO THIS FIRST, BEFORE ANYTHING ELSE - 30 seconds:
+   A file called cdmp.log must appear in bin64 as soon as the game
+   starts, and the panel must be there.
+     - Both there? Good, the mod loaded. Carry on.
+     - Not there? Stop and tell me. Do not spend time on the
+       connection steps, because the mod is not loading at all.
+       The usual cause is that dinput8.dll was not renamed to
+       winmm.dll, or bin64 already had a winmm.dll from another
+       mod. (The rename is required because the game imports
+       WINMM.dll and does NOT import DINPUT8.dll - a file named
+       dinput8.dll would just sit there and never load.)
+   This tells us "it does not load" and "it loads but will not
+   connect" apart, which are completely different problems.
+
 
 HOW TO PLAY TOGETHER
 --------------------
@@ -307,6 +321,18 @@ INSTALL
 
 3. Start the game. A panel appears top-left; F8 toggles it.
    No panel? Send me cdmp.log from bin64.
+
+   FIRST, BEFORE ANYTHING ELSE (30 seconds): cdmp.log must appear
+   in bin64 and the panel must be there.
+     - Both there? The mod loaded. Carry on.
+     - Not there? Stop and tell me - the mod is not loading at
+       all, and the connection steps cannot help. Usually it means
+       dinput8.dll was not renamed to winmm.dll, or bin64 already
+       had a winmm.dll. (The rename is required: the game imports
+       WINMM.dll and does NOT import DINPUT8.dll, so a file called
+       dinput8.dll would never be loaded.)
+   This separates "does not load" from "loads but will not
+   connect", which are very different problems.
 
 
 PLAY
