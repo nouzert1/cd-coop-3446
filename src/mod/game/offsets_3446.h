@@ -138,11 +138,7 @@ using build_3424::kStatus_StatContainer;
 using build_3424::kTroc_Kind;
 using build_3424::kTroc_Opcode;
 using build_3424::kVtCamera;
-using build_3424::kVtCharacterControl;
-using build_3424::kVtClientActorManager;
-using build_3424::kVtControlledActor;
 using build_3424::kVtPhysicsObject;
-using build_3424::kVtStatusComponent;
 using build_3424::kVtWallUpMovementMethod;
 using build_3424::kWorldSystem_ActorManager;
 
@@ -210,6 +206,38 @@ inline constexpr uintptr_t kClientFrameClockUs = 0x70CDCE9;  // = flag + 0x3C
 // Not re-resolved for 3446: the code guard that uses it fails closed and only
 // disables time sync.
 inline constexpr uintptr_t kClientClock = 0x1416B80;
+
+// ---- vtables the mod validates against ------------------------------------
+// MEASURED on the live 3446 game, each by RTTI name and each with exactly ONE
+// match, so there is no ambiguity about which is meant:
+//   probe vtables ".?AVClientActorManager@pa@@"          -> exe+0x5939CD8
+//   probe vtables ".?AVClientChildOnlyInGameActor@pa@@"  -> exe+0x5907C90
+//
+// Why this mattered: `has_vtable(manager, base + kVtClientActorManager)` is how
+// player_reader decides the WorldSystem's ActorManager is real before touching it.
+// With the stale 3424 address the pointer still resolved to a genuine
+// .?AVClientActorManager@pa@@ object -- the field offset 0x30 was correct all
+// along -- but its vtable is at a different address now, so the comparison failed
+// and the mod reported "ClientActorManager missing". Every local-player feature
+// then reported unavailable, and the HUD read exactly like a broken mod rather
+// than a stale constant.
+//
+// A vtable is a data address, so unlike the code addresses there is no prologue
+// to check; the guard is the RTTI identity of the object being validated, which is
+// what makes a wrong value fail closed rather than read something unrelated.
+inline constexpr uintptr_t kVtClientActorManager = 0x5939CD8;  // 3424:0x5937C48
+inline constexpr uintptr_t kVtControlledActor = 0x5907C90;     // 3424:0x5905BE0
+inline constexpr uintptr_t kVtCharacterControl = 0x59388D0;    // 3424:0x5936838
+inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
+// These three have no RTTI class of that name in this image at all
+// (`probe vtables` answers "Type name not found"), so they cannot be re-resolved
+// and keep their previous values. PhysicsObject and Camera were already 0 on 3424,
+// which reads as "no check"; WallUpMovementMethod is non-zero and belongs to a
+// feature whose consumer fails closed, so a stale value costs that feature and
+// nothing else. Named here so the next person does not have to re-derive why two
+// of the seven vtables are missing from the measured list above.
+//   kVtPhysicsObject, kVtCamera                  -> 0 (unchanged, no check)
+//   kVtWallUpMovementMethod = 0x55968B8          -> unverified on 3446
 
 // ---- Troc handler instances ----------------------------------------------
 // MEASURED by running the mod's own walk against the live game, then bracketed
