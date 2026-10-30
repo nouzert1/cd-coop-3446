@@ -1,0 +1,58 @@
+﻿# cdmp_probe - port 3424 (2026-10-30T13:53:22)
+# game running: False
+# image: C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64\CrimsonDesert.exe
+
+## offline (reads the exe from disk; no game needed)
+### probe --image info
+PID      0
+Module   C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64\CrimsonDesert.exe
+Base     0x140000000  size 0x145B9000
+PE timestamp 0x6AE387F2 (known build 1.0.0.3424)
+### probe --image scan 48 89 5C 24 10 4C 89 4C 24 20 55 56 57 41 --max 3
+3 match(es) (limit reached)
+  exe+0x3A5570
+  exe+0x4A73F0
+  exe+0x4D7430
+### probe --image scan 48 89 5C 24 08 48 89 74 24 10 48 89 7C 24 --max 3
+3 match(es) (limit reached)
+  exe+0x3A5900
+  exe+0x3AAEF0
+  exe+0x3BB100
+### probe --image scan 80 3D ?? ?? ?? ?? 00 75 17 --max 12
+9 match(es)
+  exe+0x561B45
+  exe+0xA38986
+  exe+0x15F49A0
+  exe+0x2E42959
+  exe+0x2F09847
+  exe+0x300A092
+  exe+0x3EAB55B
+  exe+0x4019B90
+  exe+0x407F3A2
+### probe --image rip exe+0x561B45 --disp 2
+target exe+0x70CACAD  value <unreadable>
+### probe --image rip exe+0xA38986 --disp 2
+target exe+0x70FFB18  value <unreadable>
+### probe --image rip exe+0x15F49A0 --disp 2
+target exe+0x70CACAD  value <unreadable>
+### probe --image rip exe+0x2E42959 --disp 2
+target exe+0x70CACAD  value <unreadable>
+### probe --image rip exe+0x2F09847 --disp 2
+target exe+0x70CACAD  value <unreadable>
+### probe --image rip exe+0x300A092 --disp 2
+target exe+0x7154FE8  value <unreadable>
+### probe --image rip exe+0x3EAB55B --disp 2
+target exe+0x71A15D8  value <unreadable>
+### probe --image rip exe+0x4019B90 --disp 2
+target exe+0x70CAD95  value <unreadable>
+### probe --image rip exe+0x407F3A2 --disp 2
+target exe+0x71A84E8  value <unreadable>
+### probe --image dump exe+6EB2AD8 --size 0x30
++0000  0000000000000000        0.0000       0.0000  
++0008  0000000000000000        0.0000       0.0000  
++0010  0000000000000000        0.0000       0.0000  
++0018  0000000000000000        0.0000       0.0000  
++0020  0000000000000000        0.0000       0.0000  
++0028  0000000145AB6C00     5485.5000               exe+0x5AB6C00
+## live part skipped: CrimsonDesert.exe is not running
+## the globals in zero-filled memory (clock, minimap, world) need the game open.
