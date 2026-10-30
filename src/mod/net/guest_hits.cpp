@@ -17,6 +17,7 @@
 #include "mod/game/actor_lookup.h"
 #include "mod/log.h"
 #include "mod/net/aggro_test.h"
+#include "mod/net/boss_safe.h"
 #include "mod/net/enemy_relay.h"
 #include "common/keys.h"
 #include "mod/net/local_capture.h"
@@ -136,6 +137,9 @@ constexpr SeedDefence kSeedDefence[] = {
 
 std::atomic<bool> g_enabled{false};
 std::atomic<bool> g_stagger{false};
+// Boss safety (boss_safe.h): hits dropped because the host was in a cinematic.
+// Counted only to keep the log from flooding.
+uint32_t g_cutscene_skips = 0;
 std::mutex g_mutex;
 
 uint32_t u32_at(const uint8_t* p) {
@@ -601,6 +605,17 @@ std::vector<proto::GameEvent> guest_hits_take_events() {
         const bool fatal = it->second.fatal;
         it = g_finishing.erase(it);
         if (capture_enemy_state(enemy).dead) continue;
+        // Boss safety: neither KillCheatReq nor DieByRunOutFatalReq may end a
+        // stage boss. KillCheat skips BossPhase and the final cinematic;
+        // DieByRunOutFatal skips the finishing sequence the stage is waiting
+        // for. Both leave the host's stage without its set_battleEnd, so the
+        // arena barrier stays up and the host's quest is stuck. Leave it alive:
+        // the host's own next blow drives the script.
+        if (boss_is_boss(enemy) && boss_safe_mode()) {
+            log::info("Boss: enemy 0x{:08X} survived the finishing blow and is left alive "
+                      "for the host to finish", enemy);
+            continue;
+        }
         // The cheat path kills anything for good: only an enemy still
         // fighting us. Otherwise it stays at 1 HP for a native blow (H6).
         if (!fatal && !enemy_hostile_in_combat(enemy)) {
@@ -739,7 +754,22 @@ void apply_hit(const proto::GameEvent& ev) {
     }
     const int32_t damage =
         no_damage ? 0 : std::max(1, static_cast<int32_t>(std::lround(std::min(base * factor, kMaxHitHp))));
-    const bool lethal = damage > 0 && state.hp > 0 && static_cast<int64_t>(damage) * 1000 >= state.hp;
+    // Boss safety (boss_safe.h, pendiente-jefes.md plan J1). Against a stage boss
+    // the guest must never land the killing blow: the boss's death has to come
+    // from the host, because the host's stage script is what runs BossPhase, the
+    // final cinematic and set_battleEnd. A guest kill leaves the arena barrier
+    // up and the host's quest stuck. Bosses are also left unstaggered, and
+    // nothing at all lands while the host is inside a stage cinematic.
+    const bool boss = boss_is_boss(enemy);
+    if (boss && boss_cutscene_active()) {
+        if (g_cutscene_skips++ < 20) {
+            log::info("Boss: dropping a hit on 0x{:08X}: the host is in a stage cinematic", enemy);
+        }
+        return;
+    }
+    const bool clamp_lethal = boss && boss_safe_mode();
+    const bool lethal = damage > 0 && state.hp > 0 && static_cast<int64_t>(damage) * 1000 >= state.hp &&
+                        !clamp_lethal;
 
     bool ok = true;
     if (lethal) {
@@ -784,7 +814,8 @@ void apply_hit(const proto::GameEvent& ev) {
     // needs the AttackTargetAck (none learnt until our own player hit an
     // enemy: 7 Oct night, 0 in the whole session, analisis-ia2/P2 §4.1).
     const bool copy_here = puppet_spawned();
-    const bool can_stagger = g_stagger && !lethal && aar.size() == kAarSize && buff.size() == kBuffSize;
+    const bool can_stagger = g_stagger && !lethal && !(boss && boss_safe_mode()) &&
+                             aar.size() == kAarSize && buff.size() == kBuffSize;
     bool staggered = false;
     const char* reaction = "";
     if (copy_here && (can_stagger || ata.size() >= 0x30)) {

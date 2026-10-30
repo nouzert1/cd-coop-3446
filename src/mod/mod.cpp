@@ -31,6 +31,7 @@
 #include "mod/net/player_hits.h"
 #include "mod/net/puppet_minimap.h"
 #include "mod/net/remote_puppet.h"
+#include "mod/net/boss_safe.h"
 #include "mod/net/steam_transport.h"
 #include "mod/net/room_code.h"
 #include "mod/net/time_sync.h"
@@ -400,6 +401,14 @@ void run_network(const Config& cfg, LocalSource& local) {
                 if (auto pos = net::puppet_position()) hud.remote->pos = *pos;
             }
             if (coop) hud.enemy_zone = net::suppress_hud_text();
+            // Boss bar (boss_safe.h): the guest has no native one.
+            if (const net::BossHud b = net::boss_hud(); b.active) {
+                hud.boss_active = true;
+                hud.boss_name = b.name;
+                hud.boss_hp = b.hp;
+                hud.boss_hp_max = b.hp_max;
+                hud.boss_cutscene = b.cutscene;
+            }
             // The room code, so the host can read it out and the guest sees
             // what they are joining.
             if (!room_code_text.empty()) {
@@ -798,6 +807,10 @@ DWORD WINAPI worker(LPVOID) {
             net::guest_hits_set_finish_arrow(cfg.coop_finish_arrow);
             net::puppet_set_rope_lookup(cfg.dev_rope_piece_lookup);
             net::loot_set_enabled(cfg.coop_guest_loot && !cfg.net_role_host);
+    // Boss safety (boss_safe.h): on by default. A guest's lethal blow on a stage
+    // boss kills it outside the host's script, which leaves the host's quest
+    // stuck; this keeps the killing blow with the host.
+    net::boss_set_safe_mode(cfg.coop_boss_safe);
             net::puppet_minimap_set_enemy_offset(cfg.coop_enemy_minimap_icon);
             net::puppet_want_rope_bend(cfg.dev_rope_bend);
             net::time_sync_set_mode(static_cast<net::TimeSyncMode>(cfg.coop_time_sync));

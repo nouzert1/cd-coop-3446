@@ -21,6 +21,7 @@
 #include "mod/game/safe_memory.h"
 #include "mod/log.h"
 #include "mod/net/aggro_test.h"
+#include "mod/net/boss_safe.h"
 #include "mod/net/enemy_relay.h"
 #include "mod/net/attack_probe.h"
 #include "mod/net/guest_hits.h"
@@ -116,6 +117,7 @@ std::atomic<bool> g_key_alarm{false};
 uint64_t g_damage_sent = 0, g_damage_applied = 0, g_damage_unmatched = 0;
 constexpr uint16_t kOpAttackTargetAck = 2922;  // PostProcessAttackResult_AttackTargetAck
 constexpr uint16_t kOpChangedEquipByQuickSlotAck = 2667;  // 6 B: u32 player | u16 weapon set
+constexpr uint16_t kOpSetAvoidByCutSceneAck = 2561;       // boss_safe.h: stage cinematic on/off
 
 // ---------------------------------------------------------------- writer-thread state
 game::PlayerReader g_reader;
@@ -486,6 +488,15 @@ void capture_observe_s2c(const uint8_t* packet, size_t size) {
     puppet_observe_s2c(packet, size);
     uint16_t op = 0;
     if (size >= 5) std::memcpy(&op, packet, 2);
+    if (op == kOpSetAvoidByCutSceneAck && size >= 5 + 21) {
+        // SetAvoidByCutSceneAck (2561), pendiente-jefes.md section 0.6: the one
+        // clean signal that a stage cinematic is starting or ending.
+        //   u8 4 | u32 user | u64 stage id | u8 flag | u32 user
+        // flag 1 = inside the cinematic. While it is up nothing of ours may
+        // land: a stage script owns the actors and an injected hit can skip the
+        // transition it is waiting for (a stuck quest on the host).
+        boss_note_cutscene(packet[5 + 12] != 0);
+    }
     if (op == kOpChangedEquipByQuickSlotAck && size == 5 + 6) {
         // u32 key | u16 weapon set: our player switched weapons from the quick
         // slots (no OtherEquipItemAck; capture 20261006-190309): our attacks change.
@@ -534,6 +545,11 @@ void capture_observe_s2c(const uint8_t* packet, size_t size) {
         std::memcpy(&hp_max, packet + 5 + 0x18, 8);
         std::memcpy(&source, packet + 5 + 0x54, 4);
         if (keys::is_game_world_key(key) && stat == kStatHP) {
+            // Boss safety (boss_safe.h): this is the only place the mod sees an
+            // enemy's HP POOL, which is what tells a stage boss apart from a
+            // normal monster without needing the game's stage-name tables. The
+            // research measured every NPC in 58 captures at <= 220 max HP.
+            if (hp_max > 0) boss_note_max_hp(key, hp_max);
             std::optional<Bytes> event;
             {
                 std::lock_guard lock(g_actors_mutex);

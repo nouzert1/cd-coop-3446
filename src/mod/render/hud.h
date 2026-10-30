@@ -24,6 +24,14 @@ struct HudData {
     // we are looking for (the guest typed it). Empty when room codes are unused.
     std::string room_code;
     bool room_hosting = false;
+    // Boss fight (boss_safe.h): the stage boss's health, read from the relayed
+    // copy. The guest has no native boss bar -- the stage that draws it exists
+    // only in the host's world -- so we draw our own.
+    bool boss_active = false;
+    std::string boss_name;
+    float boss_hp = 0.0f;
+    float boss_hp_max = 0.0f;
+    bool boss_cutscene = false;
 };
 
 struct HudOptions {

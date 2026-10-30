@@ -22,6 +22,7 @@
 #include "common/protocol.h"
 #include "common/reliable.h"
 #include "mod/net/room_codec.h"
+#include "mod/net/boss_rules.h"
 
 #include <cctype>
 
@@ -1382,6 +1383,38 @@ void test_room_code() {
     CHECK(!net::room_code_decode("!!!!!!!", ignored));
 }
 
+// Boss safety: the rules that keep a guest's blow from killing a stage boss
+// outside the host's script (which would leave the host's quest stuck).
+void test_boss_rules() {
+    // The HP threshold must never catch a normal monster. The research measured
+    // every NPC in 58 captures at <= 220 max HP. Stats travel as value*1000
+    // (offsets.h; local_capture.cpp reads "i64 hp x1000"), so 220 HP is 220000
+    // on this scale -- and the threshold has to sit ABOVE that, or every monster
+    // would be taken for a boss and co-op damage would switch itself off.
+    constexpr int64_t kToughestNpcSeenX1000 = 220 * 1000;
+    CHECK(!net::is_boss_sized_hp(0));
+    CHECK(!net::is_boss_sized_hp(1));
+    CHECK(!net::is_boss_sized_hp(kToughestNpcSeenX1000));
+    CHECK(net::kBossMaxHpX1000 > kToughestNpcSeenX1000);
+    CHECK(net::is_boss_sized_hp(net::kBossMaxHpX1000));
+    CHECK(net::is_boss_sized_hp(5000000));
+
+    // Stage names: the three boss families the research lists.
+    CHECK(net::is_boss_stage_name("cd_seq_whitebear_bossencounter_stand"));
+    CHECK(net::is_boss_stage_name("cd_boss_blissredknight_9000"));
+    CHECK(net::is_boss_stage_name("cd_seq_quest_ludvig_boss_9900"));
+    CHECK(net::is_boss_stage_name("bossrematch_0001"));
+    CHECK(net::is_boss_stage_name("abyss_bossrush_0001_phase00_00"));
+
+    // Ordinary stages must NOT be treated as bosses, or the safety mode would
+    // silently change how normal enemies die.
+    CHECK(!net::is_boss_stage_name(""));
+    CHECK(!net::is_boss_stage_name("cd_m01_m02_monster_wolf"));
+    CHECK(!net::is_boss_stage_name("cd_seq_spawn_docu_npc_01"));
+    CHECK(!net::is_boss_stage_name("cd_seq_quest_escort_merchant"));
+    CHECK(!net::is_boss_stage_name("cd_field_village_idle"));
+}
+
 }  // namespace
 
 int main() {    test_pattern();
@@ -1408,6 +1441,7 @@ int main() {    test_pattern();
     test_enemy_zone_message();
     test_enemy_zone_machine();
     test_room_code();
+    test_boss_rules();
     if (g_failures == 0) std::printf("All tests passed\n");
     return g_failures == 0 ? 0 : 1;
 }

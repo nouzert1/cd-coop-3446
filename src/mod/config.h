@@ -112,6 +112,19 @@ struct Config {
     bool dev_rope_piece_lookup = false;
     // Guest: loot from the host's enemies we help kill, via a twin on our server (loot_twin.h).
     bool coop_guest_loot = false;
+    // Boss safety (boss_safe.h, pendiente-jefes.md plan J1). A boss fight here is
+    // a scripted STAGE that the host's client drives: it owns the phases, the
+    // cinematics and the set_battleEnd that closes the fight. The boss exists
+    // only in the host's world, so a guest's lethal blow kills it outside that
+    // script -- no phase, no final cinematic, no battle end, and the host's
+    // quest is left stuck behind the arena barrier.
+    //
+    // On (default): the guest still does damage (and so still helps), but never
+    // lands the killing blow, never staggers a boss, and nothing either way
+    // lands while the host is inside a stage cinematic. The host's own blow
+    // does the finish, which is what advances its script. Off restores the old
+    // behaviour exactly, for comparison.
+    bool coop_boss_safe = true;
     // Minimap icon (table offset) of the other player's enemy copies; 0 = the game's (none).
     // +0x10A Actor_Enemy (the red dot); +0x112 is the boss diamond (minimapa-icono-enemigo.md).
     int coop_enemy_minimap_icon = 0x10A;

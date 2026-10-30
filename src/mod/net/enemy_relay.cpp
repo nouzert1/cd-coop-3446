@@ -17,6 +17,7 @@
 #include "common/keys.h"
 #include "mod/game/actor_lookup.h"
 #include "mod/log.h"
+#include "mod/net/boss_safe.h"
 #include "mod/net/local_capture.h"
 #include "mod/net/loot_twin.h"
 #include "mod/net/native_suppress.h"
@@ -307,6 +308,13 @@ int strip_spawn_identity(Bytes& load) {
         zero(46, 6);                     // element id, instance serial
         stripped = 1;
     } else if (const uint32_t seq = at(1043); seq && (at(1047) & 0xF0000000u) == 0x20000000u) {
+        // Boss detection (boss_safe.h): this is the stage that spawned the
+        // actor. The mod cannot turn that hash into a stage name (it never
+        // reads the game's stage files), so the hash is only remembered as
+        // "came from a trigger/sequence stage"; the boss decision itself is
+        // made from the enemy's HP pool, which needs no name table. See
+        // boss_safe.h for why.
+        boss_note_spawn_origin(seq, std::string{});
         replace_all(load, seq, 0);
         zero(1047, 8);
         stripped = 3;

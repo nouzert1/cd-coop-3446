@@ -32,8 +32,7 @@ constexpr wchar_t kDefaultIni[] =
     L"; Host: accept only this friend (empty = any friend playing)\r\n"
     L"peer_steamid=\r\n"
     L"\r\n"
-    L"[room]\r\n"
-    L"; Short room code: type your friend's code here to enter their world.\r\n"
+    L"[room]\r\n"    L"; Short room code: type your friend's code here to enter their world.\r\n"
     L"; HOST: leave it empty -- the mod creates a Steam lobby and shows the code\r\n"
     L";       in the panel (F8) and in cdmp.log. Read it out to your friend.\r\n"
     L"; GUEST: put the host's code here. Lower case and dashes are fine.\r\n"
@@ -60,7 +59,17 @@ constexpr wchar_t kDefaultIni[] =
     L"; Playout delay in ms (longer = smoother climbing, more lag)\r\n"
     L"delay_ms=300\r\n"
     L"; Sideways offset of the other player in metres (0 = exact position)\r\n"
-    L"offset_m=0\r\n";
+    L"offset_m=0\r\n"
+    L"; Boss safety. A boss fight here is a scripted stage that the HOST's client\r\n"
+    L"; drives: it owns the phases, the cinematics and the battle end. The boss\r\n"
+    L"; exists only in the host's world, so a guest's killing blow kills it outside\r\n"
+    L"; that script -- no phase, no final cinematic, no battle end, and the host's\r\n"
+    L"; quest is left stuck behind the arena barrier.\r\n"
+    L"; 1 (default): the guest still does damage and so still helps, but never lands\r\n"
+    L";              the killing blow, never staggers a boss, and nothing lands\r\n"
+    L";              while the host is inside a stage cinematic.\r\n"
+    L"; 0: the old behaviour, for comparison. Only with a save backup.\r\n"
+    L"boss_safe=1\r\n";
 
 std::wstring read_string(const std::wstring& path, const wchar_t* section, const wchar_t* key,
                          const std::string& fallback) {
@@ -165,6 +174,9 @@ Config load_config(const std::wstring& ini_path) {
     c.coop_finish_arrow = read_uint(ini_path, L"coop", L"finish_arrow", 1) != 0;
     c.dev_rope_piece_lookup = read_uint(ini_path, L"dev", L"rope_piece_lookup", 0) != 0;
     c.coop_guest_loot = read_uint(ini_path, L"coop", L"guest_loot", 0) != 0;
+    // Boss safety (boss_safe.h): default ON, because the failure it prevents is a
+    // stuck quest in the HOST's save, not a cosmetic problem.
+    c.coop_boss_safe = read_uint(ini_path, L"coop", L"boss_safe", 1) != 0;
     c.dev_rope_bend = read_uint(ini_path, L"dev", L"rope_bend", 0) != 0;
     {
         const std::wstring v = read_string(ini_path, L"coop", L"enemy_minimap_icon", "");

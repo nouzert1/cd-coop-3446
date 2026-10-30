@@ -113,6 +113,7 @@ add_library(cdmp_mod SHARED
     src/mod/game/game_clock.cpp
     src/mod/net/steam_transport.cpp
     src/mod/net/room_code.cpp
+    src/mod/net/boss_safe.cpp
     src/mod/net/time_sync.cpp
     src/mod/render/dx12_hook.cpp
     src/mod/render/hud.cpp

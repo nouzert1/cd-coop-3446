@@ -122,6 +122,25 @@ void hud_draw(float width, float height) {
         ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1),
                            en ? "Network: looking for the other player..." : "Red: buscando al otro jugador...");
     }
+    if (d.boss_active && d.boss_hp_max > 0) {
+        // The guest gets no native boss bar: the stage that draws it
+        // (BossNameTagView2) runs only in the host's world. So draw one.
+        ImGui::Separator();
+        const float frac = d.boss_hp / d.boss_hp_max;
+        char overlay[96];
+        std::snprintf(overlay, sizeof overlay, "%.0f / %.0f", d.boss_hp, d.boss_hp_max);
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.75f, 0.15f, 0.15f, 1));
+        ImGui::ProgressBar(frac < 0 ? 0.0f : (frac > 1 ? 1.0f : frac), ImVec2(-1, 0), overlay);
+        ImGui::PopStyleColor();
+        if (!d.boss_name.empty()) {
+            ImGui::Text(en ? "Boss: %s" : "Jefe: %s", d.boss_name.c_str());
+        }
+        if (d.boss_cutscene) {
+            // Worth saying out loud: the guest cannot act and nothing lands.
+            ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1),
+                               en ? "Host cutscene: wait" : "Cinematica del anfitrion: espera");
+        }
+    }
     if (!d.room_code.empty()) {
         // The host reads this out; the guest sees what they typed.
         if (d.room_hosting) {
