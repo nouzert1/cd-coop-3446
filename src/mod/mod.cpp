@@ -817,6 +817,12 @@ DWORD WINAPI worker(LPVOID) {
         // host's quest stuck behind the arena barrier.
         net::boss_set_safe_mode(cfg.coop_boss_safe);
         log::info("Config: boss safety {}", cfg.coop_boss_safe ? "ON (the host lands the killing blow)" : "OFF");
+        // Shared loot is the guest's, and only means anything with co-op on: say
+        // so here so a tester can tell from the log whether to expect it.
+        log::info("Config: shared loot (guest) {}",
+                  !cfg.coop_guest_loot ? "off"
+                  : cfg.net_role_host ? "set, but this is the host (it is your own world)"
+                                      : "ON (your own drop from the host's kills)");
         if (in_game && cfg.coop_enabled) {
             net::enemy_set_auto(cfg.coop_enemy_auto && !cfg.coop_suppress_lab);
             net::guest_hits_set_finish_arrow(cfg.coop_finish_arrow);

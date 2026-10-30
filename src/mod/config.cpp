@@ -69,7 +69,16 @@ constexpr wchar_t kDefaultIni[] =
     L";              the killing blow, never staggers a boss, and nothing lands\r\n"
     L";              while the host is inside a stage cinematic.\r\n"
     L"; 0: the old behaviour, for comparison. Only with a save backup.\r\n"
-    L"boss_safe=1\r\n";
+    L"boss_safe=1\r\n"
+    L"; Shared loot (GUEST only). When you help the host kill one of their enemies,\r\n"
+    L"; your own world was never going to give you anything for it: the creature only\r\n"
+    L"; really exists in the host's world. With this on, your server makes its own\r\n"
+    L"; copy of that creature once the copy you helped kill goes down, kills it here,\r\n"
+    L"; and lets you loot it normally -- so each of you takes their own drop from the\r\n"
+    L"; same kill, and your own quests and XP are untouched.\r\n"
+    L"; It only ever fires for an enemy you actually helped kill, close to you\r\n"
+    L"; (30 m), and rate-limited. Hosts do not need it (it is the host's own world).\r\n"
+    L"guest_loot=0\r\n";
 
 std::wstring read_string(const std::wstring& path, const wchar_t* section, const wchar_t* key,
                          const std::string& fallback) {
