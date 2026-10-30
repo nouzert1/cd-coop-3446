@@ -73,7 +73,7 @@ struct Api {
     // the caller reported "CreateLobby result could not be read" -- a read that was
     // actually fine, rejected by a flag that was never really written.
     //
-    // k_iCallback for LobbyCreated_t is 513 (see the static_assert below); passing
+    // k_iCallback for LobbyCreated_t is kLobbyCreatedCallback above (513); passing
     // the real value also lets Steam itself reject a result of the wrong type.
     bool (*get_call_result)(void*, SteamAPICall_t, void*, int, int, bool*) = nullptr;
     uint64_t (*get_steam_id)(void*) = nullptr;
