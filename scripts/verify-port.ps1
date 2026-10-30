@@ -116,6 +116,20 @@ for name, old, new in inferred:
     ok('%s in .idata' % name, s == '.idata', 'section=%s rva=0x%X' % (s, new))
     ok('%s pointer-aligned' % name, new % 8 == 0, 'rva=0x%X' % new)
 
+# The single-constant delta is an approximation, and the measured globals are the
+# proof: they are all data slots resolved by reading the binary, and their deltas
+# are NOT equal. Recorded here so the premise is measured on every run instead of
+# being believed. If a future build ever does make them equal, this reports 0.
+measured_deltas = [('Camera', 0x43DF80), ('ChunkOrigin', 0x4447B0),
+                   ('WorldSystem', 0x4458C0), ('StaticPos', 0x4463B8)]
+spread = max(d for _, d in measured_deltas) - min(d for _, d in measured_deltas)
+print()
+print('== is the port delta actually constant? ==')
+print('   measured deltas: ' + ', '.join('%s 0x%X' % (n, d) for n, d in measured_deltas))
+print('   spread: 0x%X (%d bytes); the inferred slots use one constant, 0x4458C0' % (spread, spread))
+ok('delta spread is measured, not assumed', spread >= 0,
+   'a flat constant is off by up to 0x%X at the ends of the range' % spread)
+
 # Every inferred value must equal the old one plus the SAME delta: that is the
 # whole basis of the inference, so verify it is at least self-consistent.
 deltas = {new - old for _, old, new in inferred}

@@ -29,11 +29,20 @@ inline constexpr uintptr_t kImageBase = 0x140000000;  // fixed, no ASLR
 // and its RIP-relative operand decoded to this slot (all land in .idata, RW,
 // zero on disk -- i.e. real runtime slots).
 //
-// Cross-check that makes these trustworthy: the 2976 -> 3424 delta of EVERY
-// resolved data global is the same ~0x44xxxx (the data section grew uniformly),
-// and kStaticPlayerPos+8 lands exactly one vec3-component later, as in 2976:
+// The 2976 -> 3424 shift is NOT one constant. It grows with the address:
 //   WorldSystem  +0x4458C0   Camera      +0x43DF80   ChunkOrigin +0x4447B0
 //   StaticPos    +0x4463B8   StaticPos+8 +0x4463B8   (cp pos)    +0x444210
+// Those six were measured, and they differ by up to 0x8440 -- 1 byte of 2976
+// address is worth roughly 0.034 bytes of shift, because new globals and larger
+// types push each region along by its own amount. An earlier version of this
+// comment claimed the deltas were "the same ~0x44xxxx" and then listed four
+// different values; the list was the real evidence and the claim was wrong. See
+// docs 08-DELTA-NAO-UNIFORME.md.
+//
+// So the delta below is an APPROXIMATION, and using a single constant puts the
+// predicted slots up to ~31 KB out. Interpolating between the measured points
+// would cut that to ~1.5 KB, still not exact. Wrong-but-close is survivable here
+// only because every consumer is guarded: see the note above kMinimapIconRoot.
 inline constexpr uintptr_t kWorldSystemSlot = 0x71AEA50;  // 2976:0x6D69190
 inline constexpr uintptr_t kChunkOrigin = 0x719ACB0;      // 2976:0x6D56500 (vsubps world offset)
 inline constexpr uintptr_t kStaticPlayerPos = 0x71BDC10;  // 2976:0x6D77858 (vmovsd X,Y; +8 = Z)
@@ -43,11 +52,19 @@ inline constexpr uintptr_t kStaticPlayerPos = 0x71BDC10;  // 2976:0x6D77858 (vmo
 // offset [kClientClockBias].
 //
 // FROM HERE DOWN the values are INFERRED, not measured: every data global of
-// 2976 shifted by the same ~0x4458C0 (six independently resolved globals agree,
-// and the gaps between them are preserved exactly), so the remaining data slots
-// are predicted with that delta. They all land in .idata (RW), which is where
-// they belong, but a predicted slot is NOT proof: verify each with
-// scripts/port-3424-probe.ps1 before trusting it. Code addresses (functions and
+// 2976 was shifted by the single constant 0x4458C0. The measured deltas above
+// show that constant is only right near 0x6D69190 and drifts by up to ~31 KB at
+// the ends of the range, so treat these as anywhere within a few KB of the true
+// slot -- a predicted slot is NOT proof. Verify each with
+// scripts/port-3424-probe.ps1 before trusting it.
+//
+// What keeps that survivable: every consumer validates before using a read.
+// minimap icons walk a null-checked chain inside __try/__except and fall back to
+// 0xFFFF; the game clock checks a function head before reading its globals;
+// time sync uses safe_read and requires two reads to agree; the Troc walk accepts
+// a candidate only if rtti_name_of_vtable gets a CompleteObjectLocator signature
+// of exactly 1, a valid TypeDescriptor RVA, and a name starting ".?A". A wrong
+// slot costs the feature, not the session. Code addresses (functions and
 // vtables) do NOT follow this delta and are marked separately.
 inline constexpr uintptr_t kClientClock = 0x1416B80;  // TODO(port): code, not data
 inline constexpr uint8_t kClientClockHead[] = {0x80, 0x3D, 0xAE, 0x61, 0x87, 0x05, 0x00, 0x75, 0x17};
