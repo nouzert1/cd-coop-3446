@@ -21,7 +21,7 @@
 namespace cdmp::net {
 namespace {
 
-namespace off = game::build_3424;
+namespace off = game::build_3446;
 
 constexpr uint16_t kOpCurrentTargetChangeReq = 2984;  // u32 actor | u32 target | ...
 constexpr uint32_t kPuppetPlayer = 0xA010F001;
