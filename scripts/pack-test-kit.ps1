@@ -2,7 +2,7 @@
 #
 #   .\scripts\pack-test-kit.ps1
 #
-# Output: dist\cdmp-3424-test-kit\  and  dist\cdmp-3424-test-kit.zip
+# Output: dist\cdmp-3446-test-kit\  and  dist\cdmp-3446-test-kit.zip
 #
 # The ZIP is identical for both players, which matters: the mod compares a build
 # id on connect and shows "Different mod versions" if they do not match, so both
@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $bin = Join-Path $root "build\bin\$Config"
 $dist = Join-Path $root 'dist'
-$kit = Join-Path $dist 'cdmp-3424-test-kit'
+$kit = Join-Path $dist 'cdmp-3446-test-kit'
 
 if (-not (Test-Path "$bin\cdmp.asi")) { throw "Build first: $bin\cdmp.asi not found" }
 if (Get-Process CrimsonDesert -ErrorAction SilentlyContinue) {
@@ -152,7 +152,7 @@ guest_loot=1
 # --- the read-me the friend actually follows ------------------------------
 @'
 ==========================================================
- Crimson Desert Co-op - test kit (build 1.0.0.3424)
+ Crimson Desert Co-op - test kit (build 1.0.0.3446)
 ==========================================================
 
 READ THIS FIRST - the important part
@@ -173,8 +173,14 @@ update would change the game's build and this mod would stop
 loading (it refuses to run on a build it does not know, on
 purpose, so it can never corrupt your save).
 
-If your game is already newer than 1.0.0.3424, tell me - the mod
-will not work and I need to re-port it.
+This is not hypothetical: the game updated by itself from 1.0.0.3424
+to 1.0.0.3446 in the middle of building this mod. The mod went inert
+exactly as described - it did not crash and did not touch the save -
+and every address had to be measured again on the new build.
+
+If your game is newer than 1.0.0.3446, tell me - the mod will not
+work and I need to re-port it. To check: right-click
+CrimsonDesert.exe > Properties > Details > File version.
 
 
 HOW TO INSTALL
@@ -309,7 +315,7 @@ RULES WHILE TESTING (please follow these)
 
 @'
 ==========================================================
- Crimson Desert Co-op - test kit (build 1.0.0.3424)
+ Crimson Desert Co-op - test kit (build 1.0.0.3446)
 ==========================================================
 
 BACK UP YOUR SAVE FIRST
@@ -439,7 +445,7 @@ $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
 $lines | Set-Content -Path (Join-Path $kit 'SHA256SUMS.txt') -Encoding ASCII
 
 # --- zip ------------------------------------------------------------------
-$zip = Join-Path $dist 'cdmp-3424-test-kit.zip'
+$zip = Join-Path $dist 'cdmp-3446-test-kit.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path (Join-Path $kit '*') -DestinationPath $zip
 

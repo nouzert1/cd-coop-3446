@@ -135,6 +135,20 @@ ok('kImageBase in the header is present', _hdr_base is not None, 'not found')
 ok('image base matches kImageBase', imgbase == _hdr_base,
    'header 0x%X, image 0x%X' % (_hdr_base or 0, imgbase))
 
+# kImageSize is the bound guards use for "is this address inside the game at all?".
+# It looks like a constant and is not one: it shrank from 0x145B9000 to 0x14268000
+# on this patch. A stale value keeps every existing check passing, because the
+# addresses are far below either bound, so nothing notices until a bad address is
+# accepted -- which is the one thing the bound exists to stop. Compared against the
+# image's own SizeOfImage so it cannot drift unnoticed.
+_hdr_size = _hdr_value('kImageSize')
+_img_size = struct.unpack_from('<I', d, pe + 24 + 56)[0]  # SizeOfImage
+print('  header says  : kImageSize=0x%X   image SizeOfImage=0x%X'
+      % (_hdr_size or 0, _img_size))
+ok('kImageSize in the header is present', _hdr_size is not None, 'not found')
+ok('kImageSize matches the image SizeOfImage', _hdr_size == _img_size,
+   'header 0x%X, image 0x%X' % (_hdr_size or 0, _img_size))
+
 # ---- measured: re-decode the signature sites and compare to offsets.h ----
 # RIP-relative rule: the displacement is measured from the END of the disp32,
 # i.e. target = (site + disp_offset) + 4 + disp32.  Getting this wrong is easy

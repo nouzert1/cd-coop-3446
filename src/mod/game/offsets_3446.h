@@ -150,6 +150,16 @@ using build_3424::kWorldSystem_ActorManager;
 inline constexpr uint32_t kPeTimestamp = 0x6AE46DD0;  // 3424:0x6AE387F2, 2976:0x6AB28F00
 inline constexpr uintptr_t kImageBase = 0x140000000;  // fixed, no ASLR
 
+// SizeOfImage from the PE optional header: the mapped extent of the module, and so
+// the bound for "is this address even inside the game?".
+//
+// This is a PER-BUILD value, not a constant, which is easy to miss because it looks
+// like one -- and it shrank on this patch. 3424 was 0x145B9000; 3446 is 0x14268000.
+// A guard still using the old number keeps passing, because every address it bounds
+// sits far below both. But a bound that is too large silently accepts an address
+// outside the image, which is precisely what the bound exists to prevent.
+inline constexpr uintptr_t kImageSize = 0x14268000;  // 3424:0x145B9000
+
 // ---- static globals (RVAs) ------------------------------------------------
 // All resolve into .bss (the zero-filled part of .idata), i.e. real runtime slots
 // that read as zero on disk -- which is why they can only be confirmed live.
