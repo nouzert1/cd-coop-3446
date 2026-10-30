@@ -544,22 +544,47 @@ foreach ($key in 'enabled=1', 'transport=steam', 'enemy_auto=1', 'guest_hits=1',
 # removed -- but it is the first thing the friend opens, so assert it is there.
 if (-not (Test-Path (Join-Path $kit 'LEIA-ME.txt'))) { throw 'LEIA-ME.txt is missing' }
 
+# What the guest checks to know he installed THIS kit and not an older one.
+#
+# A version mismatch is the single most confusing failure this mod has: everything
+# connects, the distance updates (the position exchange works), and no character
+# appears -- because the mod refuses to spawn one when the two build ids differ, so
+# the test looks almost-working and the cause is invisible. Printing both the build id
+# (what the panel shows) and the file hash (what Windows shows) turns that into a
+# two-second check, in the guide and in INSTALL.md.
+#
+# Defined here, before both documents, because each of them interpolates these values.
+$build_id_upper = if ($built) { $built.ToUpper() } else { '(unknown)' }
+$asi_hash = (Get-FileHash (Join-Path $kit 'cdmp.asi') -Algorithm SHA256).Hash
+$steam_line = if ($HostSteamId) { $HostSteamId } else { '(vazio: conecta no unico amigo jogando)' }
+
+# The agent-facing install document.
+#
+# The guest is having an AI coding agent do the install, and the other texts in this
+# kit are written for a person: they say "copy these files into bin64" without a path
+# to copy from, and describe the rename in prose. INSTALL.md is the mechanical
+# version -- exact PowerShell, the build-version check that has to happen BEFORE
+# installing, the winmm.dll conflict check, and the SHA256 to verify afterwards.
+#
+# It lives in kit/coop/ and is copied here rather than generated, because it is
+# mostly prose and belongs in a file that can be reviewed and diffed on its own.
+# It is stamped with this kit's build id and hash at pack time so the numbers in it
+# can never drift from the binary being shipped.
+$install_src = Join-Path $root 'kit\coop\INSTALL.md'
+if (-not (Test-Path $install_src)) { throw "Missing $install_src" }
+$install_text = Get-Content $install_src -Raw -Encoding UTF8
+$install_text = $install_text.Replace('{{BUILD_ID}}', $build_id_upper).Replace('{{ASI_SHA256}}', $asi_hash)
+if ($install_text -match '\{\{') { throw 'INSTALL.md still has an unstamped placeholder' }
+# A stamp that silently expanded to nothing would produce a document telling the agent
+# to verify against an empty string, which passes any check. Assert it landed.
+if ($install_text -notmatch [regex]::Escape($asi_hash)) { throw 'INSTALL.md did not get the hash' }
+$install_text | Set-Content -Path (Join-Path $kit 'INSTALL.md') -Encoding UTF8
+
 $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
     $h = (Get-FileHash (Join-Path $kit $f) -Algorithm SHA256).Hash
     '{0}  {1}' -f $h, $f
 }
 $lines | Set-Content -Path (Join-Path $kit 'SHA256SUMS.txt') -Encoding ASCII
-
-# What the friend checks to know he installed THIS kit and not an older one.
-#
-# A version mismatch is the single most confusing failure this mod has: everything
-# connects, the distance updates, and no character appears -- so the test looks
-# almost-working and the actual cause is invisible. Printing both the build id (what
-# the panel shows) and the file hash (what Windows shows) turns that into a
-# two-second check, and means an out-of-date download is caught before a test.
-$build_id_upper = if ($built) { $built.ToUpper() } else { '(unknown)' }
-$asi_hash = (Get-FileHash (Join-Path $kit 'cdmp.asi') -Algorithm SHA256).Hash
-$steam_line = if ($HostSteamId) { $HostSteamId } else { '(vazio: conecta no unico amigo jogando)' }
 
 # --- the Portuguese quick-start -------------------------------------------
 #
