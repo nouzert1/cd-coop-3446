@@ -817,12 +817,25 @@ DWORD WINAPI worker(LPVOID) {
         // host's quest stuck behind the arena barrier.
         net::boss_set_safe_mode(cfg.coop_boss_safe);
         log::info("Config: boss safety {}", cfg.coop_boss_safe ? "ON (the host lands the killing blow)" : "OFF");
-        // Shared loot is the guest's, and only means anything with co-op on: say
-        // so here so a tester can tell from the log whether to expect it.
-        log::info("Config: shared loot (guest) {}",
-                  !cfg.coop_guest_loot ? "off"
-                  : cfg.net_role_host ? "set, but this is the host (it is your own world)"
-                                      : "ON (your own drop from the host's kills)");
+        // Shared loot is the guest's, and only means anything with co-op on.
+        //
+        // It also cannot work without the enemy relay: the twin is spawned from
+        // the variant of the copy we helped kill, and that copy is only ever
+        // known to the relay (enemy_relay.cpp fills g_copy_variant as it relays
+        // each enemy). With enemy_auto off, zone_capable() is false, no copies
+        // are tracked, and loot silently never fires -- the same "looks enabled,
+        // does nothing" trap as an INI in the wrong encoding. So say plainly
+        // which of the two switches is missing instead of reporting "ON".
+        const bool loot_wanted = cfg.coop_guest_loot && !cfg.net_role_host;
+        const bool relay_needed = cfg.coop_enemy_auto && !cfg.coop_suppress_lab;
+        if (!loot_wanted) {
+            log::info("Config: shared loot (guest) {}", cfg.coop_guest_loot ? "off (this is the host)" : "off");
+        } else if (!relay_needed) {
+            log::warn("Config: shared loot is ON but [coop] enemy_auto=0, so it can never fire: "
+                      "the enemy relay is what tells the mod which creature a copy is. Set enemy_auto=1.");
+        } else {
+            log::info("Config: shared loot (guest) ON (your own drop from the host's kills)");
+        }
         if (in_game && cfg.coop_enabled) {
             net::enemy_set_auto(cfg.coop_enemy_auto && !cfg.coop_suppress_lab);
             net::guest_hits_set_finish_arrow(cfg.coop_finish_arrow);

@@ -71,6 +71,30 @@ enabled=1
 ; smoother but laggier. 300 is a sane starting point.
 delay_ms=300
 
+; ENEMY RELAY -- leave at 1, shared loot depends on it.
+; This is what makes the host's enemies appear as copies in your world. It is
+; also the only thing that tells the mod WHICH creature a copy is, and shared
+; loot needs that to know what to put in your world. With this at 0, shared loot
+; silently never fires.
+enemy_auto=1
+
+; YOUR BLOWS ON THE HOST'S ENEMIES -- leave at 1, shared loot depends on it too.
+; With this on, when you hit a copy of one of the host's enemies, the blow is
+; applied to the real enemy in the host's world. It is also what tells the mod
+; that YOU took part in the kill, which is the condition shared loot fires on:
+; a creature you never touched gives you nothing, by design.
+; (This replaces the older "damage" mirroring below; if both are set, this one
+; wins and the mod says so in the log.)
+guest_hits=1
+; The stagger reaction on those blows. Leave at 0 for the first test: it injects
+; a hit reaction into the other player's enemy, which is the riskiest part.
+guest_hit_stagger=0
+
+; MIRRORED DAMAGE -- leave at 0 when guest_hits is 1.
+; An older, blunter way to hurt the host's enemies (send the damage number).
+; It and guest_hits would both hurt the same enemy, so guest_hits wins.
+damage=0
+
 ; BOSS SAFETY -- leave this at 1.
 ; A boss fight here is a scripted scene that the HOST's game runs: it owns the
 ; boss's phases, the cutscenes and the end of the fight. The boss only really
@@ -278,9 +302,13 @@ if ($head.Length -lt 2 -or $head[0] -ne 0xFF -or $head[1] -ne 0xFE) {
     throw ("cdmp.ini is not UTF-16 LE (first bytes: {0}). The mod reads it with the wide " +
            "INI API, so every key would be silently ignored.") -f (($head[0..1]) -join ',')
 }
-# A setting the test depends on must actually be in the file we ship.
+# A setting the test depends on must actually be in the file we ship. The loot
+# keys are listed together because shared loot needs ALL of them: without
+# enemy_auto the relay tracks no copies, and without guest_hits the guest never
+# counts as having helped the kill -- either one missing and the feature silently
+# does nothing while still reading as "on".
 $iniText = Get-Content $iniPath -Encoding Unicode -Raw
-foreach ($key in 'transport=steam', 'boss_safe=1', 'guest_loot=1') {
+foreach ($key in 'transport=steam', 'enemy_auto=1', 'guest_hits=1', 'boss_safe=1', 'guest_loot=1') {
     if ($iniText -notmatch [regex]::Escape($key)) { throw "cdmp.ini is missing '$key'" }
 }
 
