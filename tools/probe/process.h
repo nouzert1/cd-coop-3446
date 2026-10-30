@@ -10,13 +10,21 @@
 #include "common/pattern.h"
 
 namespace probe {
-
 class Process {
 public:
     ~Process();
 
     bool attach_by_name(const std::wstring& exe_name);
     bool attach_by_pid(uint32_t pid);
+
+    // Offline mode: read the exe straight off disk, with no process at all.
+    //
+    // Everything that only needs the image -- info, scan, rip, classes, vtables,
+    // dump, findptr -- works this way, which is what makes the port checkable
+    // without the game running. It cannot answer questions about live state
+    // (pointer chains, RTTI of a live object), and say so rather than guessing.
+    bool open_image_file(const std::wstring& path);
+    bool is_file_mode() const { return file_bytes_ != nullptr; }
 
     uint32_t pid() const { return pid_; }
     uint64_t module_base() const { return base_; }
@@ -54,12 +62,34 @@ public:
 
 private:
     bool load_main_module();
+    // File mode: translate an image RVA to an offset in the mapped file. In a PE
+    // on disk a section's raw data starts at PointerToRawData, not at its virtual
+    // address, so a straight read at the RVA would land in the wrong place (or in
+    // the header). Returns nullopt for RVAs that are not backed by file data --
+    // e.g. .bss, which exists only once the loader maps the image.
+    std::optional<uint64_t> rva_to_offset(uint64_t rva) const;
 
     void* handle_ = nullptr;
     uint32_t pid_ = 0;
     uint64_t base_ = 0;
     uint64_t size_ = 0;
     std::wstring path_;
+
+    // File mode state. base_ is the image base from the PE header (the probe
+    // reports addresses as base_ + rva, exactly as in process mode). The handles
+    // are void* so this header does not have to pull in windows.h.
+    void* file_ = nullptr;
+    void* mapping_ = nullptr;
+    const uint8_t* file_bytes_ = nullptr;
+    uint64_t file_size_ = 0;
+    uint64_t size_of_headers_ = 0;
+    struct Section {
+        uint64_t va;
+        uint64_t vsize;
+        uint64_t raw;
+        uint64_t rsize;
+    };
+    std::vector<Section> sections_;
 };
 
 }  // namespace probe

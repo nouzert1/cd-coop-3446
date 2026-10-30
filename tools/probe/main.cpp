@@ -31,7 +31,12 @@ constexpr uint32_t kKnownTimestamp = 0x6AE387F2;  // CrimsonDesert.exe 1.0.0.342
 
 void usage() {
     std::puts(
-        "cdmp_probe [--process NAME | --pid N] <command> ...\n"
+        "cdmp_probe [--process NAME | --pid N | --image FILE] <command> ...\n"
+        "\n"
+        "  --image FILE   read the exe off disk, no process needed. Works for\n"
+        "                 anything that only needs the image (info, scan, rip,\n"
+        "                 classes, vtables, dump, findptr). Live queries -- chain,\n"
+        "                 watch, rtti, --heap -- cannot work this way and say so.\n"
         "\n"
         "  info                                 process, module, build check\n"
         "  scan <aob> [--max N] [--heap]        find a byte pattern (exe image or heap)\n"
@@ -491,7 +496,27 @@ int main(int argc, char** argv) {
 
     Process p;
     bool attached = false;
-    if (a.opt.contains("--pid")) {
+    if (a.opt.contains("--image")) {
+        // Offline: the exe off disk. No process, so anything that needs live state
+        // is refused below rather than answered with a plausible-looking zero.
+        const std::string path = a.get("--image", "");
+        attached = p.open_image_file(std::wstring(path.begin(), path.end()));
+        if (!attached) {
+            std::printf("Cannot open image '%s' (error %lu)\n", path.c_str(), GetLastError());
+            return 1;
+        }
+        const std::string& c = a.pos[0];
+        if (c == "chain" || c == "watch" || c == "rtti") {
+            std::printf("'%s' needs live memory (a running game); --image only reads the file.\n"
+                        "Commands that work with --image: info scan sigs rip read dump classes "
+                        "vtables findptr\n", c.c_str());
+            return 2;
+        }
+        if (a.flag("--heap")) {
+            std::printf("'--heap' needs live memory; --image only reads the file.\n");
+            return 2;
+        }
+    } else if (a.opt.contains("--pid")) {
         attached = p.attach_by_pid(static_cast<uint32_t>(parse_count(a.get("--pid", "0"), 0)));
     } else {
         const std::string name = a.get("--process", "CrimsonDesert.exe");
