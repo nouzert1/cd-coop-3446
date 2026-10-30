@@ -90,13 +90,32 @@ std::optional<PlayerSnapshot> PlayerReader::read() {
     auto ay = read_vec3(*physics + off::kPhysics_AxisY);
     auto az = read_vec3(*physics + off::kPhysics_AxisZ);
     if (!local || !origin || !ax || !ay || !az) return fail("physics data unreadable");
-    if (!math::is_orthonormal(*ax, *ay, *az)) return fail("physics basis not a rotation");
+
+    // The basis is a SEPARATE field from the position, and a bad basis must not
+    // cost us the position.
+    //
+    // This used to return early on a non-orthonormal basis, which threw away a
+    // perfectly good position read in the same call. In the first two-PC test the
+    // host's log alternated "in world" and "physics basis not a rotation", and
+    // every failure dropped that sample: the position the guest received stalled
+    // on one value for tens of seconds at a time and jumped 10-20 m when it did
+    // move ("Local: pos (-10606.81, 620.70, -3826.01) | check vs game global
+    // 0.05 m" -- the read was correct to 5 cm and frozen). The guest's panel still
+    // showed a distance, because the last good sample stayed on screen, and the
+    // character was drawn nowhere useful.
+    //
+    // The tolerance is also widened to match camera_reader.cpp, which already
+    // uses 0.05f for the same kind of game-provided basis: 0.02f is tight for
+    // physics axes that have been through the game's own float math.
+    const bool basis_ok = math::is_orthonormal(*ax, *ay, *az, 0.05f);
 
     PlayerSnapshot snap;
     snap.position = math::add(*local, *origin);
     snap.local_position = *local;
     snap.chunk_origin = *origin;
-    snap.rotation = math::quat_from_axes(*ax, *ay, *az);
+    // Without a usable basis we keep the position and leave the rotation at the
+    // identity: the other player is then drawn unrotated rather than not drawn.
+    snap.rotation = basis_ok ? math::quat_from_axes(*ax, *ay, *az) : math::Quat{};
 
     // The game keeps its own world-space copy; a large mismatch means our
     // chunk-origin math or chain is off (it lags by a frame, so allow some).

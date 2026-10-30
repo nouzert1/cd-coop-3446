@@ -256,6 +256,23 @@ void test_math() {
     CHECK(!math::is_orthonormal({1, 0, 0}, {1, 0, 0}, {0, 0, 1}));
     CHECK(!math::is_orthonormal({2, 0, 0}, {0, 1, 0}, {0, 0, 1}));
     CHECK(!math::is_orthonormal({std::nanf(""), 0, 0}, {0, 1, 0}, {0, 0, 1}));
+
+    // A basis the game itself produced is not exactly orthonormal: it has been
+    // through the engine's float math. This is the tolerance the port relies on
+    // now, and the reason is worth pinning down.
+    //
+    // player_reader used the 0.02f default while camera_reader already used
+    // 0.05f for the same kind of game-provided basis. In the two-PC test the
+    // tighter one failed on roughly half the reads, and each failure discarded a
+    // position that was correct to 5 cm -- the guest's copy of the host stalled
+    // for tens of seconds and then jumped. A basis this slightly off is a real
+    // rotation and must not cost us the position.
+    proto::Vec3 nx{0.97f, 0.0f, 0.0f}, ny{0.0f, 1.0f, 0.0f}, nz{0.0f, 0.0f, 1.0f};
+    CHECK(!math::is_orthonormal(nx, ny, nz));            // 3% off: rejected at 0.02
+    CHECK(math::is_orthonormal(nx, ny, nz, 0.05f));      // accepted at 0.05
+    CHECK(!math::is_orthonormal({1.2f, 0, 0}, ny, nz, 0.05f));  // 20% off: still garbage
+    // A pair that is far from perpendicular is not a rotation at any tolerance.
+    CHECK(!math::is_orthonormal({1, 0, 0}, {0.9f, 0.1f, 0}, {0, 0, 1}, 0.05f));
 }
 
 // Writes a record whose payload bytes all equal `fill`.
