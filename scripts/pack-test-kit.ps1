@@ -186,6 +186,20 @@ function Set-IniKey([string[]]$lines, [string]$section, [string]$key, [string]$v
 
 # The two-PC test is over Steam. Anything else cannot leave this machine.
 $iniLines = Set-IniKey $iniLines 'net' 'transport' 'steam'
+# The master switch, and it MUST be listed first of the coop keys.
+#
+# [coop] enabled is the one key that decides whether the other player appears at
+# all: config.cpp reads it with a DEFAULT OF 0, and the mod's own template INI
+# ships enabled=0, so a kit that does not force it produces a guest whose log says
+# "co-op off" while the connection itself works perfectly. That is exactly what
+# happened in the first real two-PC test: the session connected (rtt 44 ms, 71
+# remote states received, the host's position arriving every tick) and the guest
+# reported "other player: HP 1650/1650 4154 m away" -- the distance was right and
+# the character was never drawn, because nothing was spawning it.
+#
+# Every other coop flag below only tunes behaviour inside that switch, so leaving
+# it at 0 made all of them silently irrelevant.
+$iniLines = Set-IniKey $iniLines 'coop' 'enabled' '1'
 # Not asserted by the guard below, but the coop flags are what the test exercises.
 foreach ($kv in @(@('coop', 'enemy_auto', '1'), @('coop', 'guest_hits', '1'),
                   @('coop', 'boss_safe', '1'), @('coop', 'guest_loot', '1'))) {
@@ -477,8 +491,15 @@ if ($head.Length -lt 2 -or $head[0] -ne 0xFF -or $head[1] -ne 0xFE) {
 # enemy_auto the relay tracks no copies, and without guest_hits the guest never
 # counts as having helped the kill -- either one missing and the feature silently
 # does nothing while still reading as "on".
+#
+# 'enabled=1' is FIRST because it is the one that was missing and it is the master
+# switch for the whole feature: config.cpp defaults it to 0 and the mod's template
+# INI ships 0, so the first real two-PC kit went out with co-op off. The guest
+# connected perfectly and never saw the host, and this list -- which was supposed
+# to catch exactly this class of mistake -- did not look at it.
 $iniText = Get-Content $iniPath -Encoding Unicode -Raw
-foreach ($key in 'transport=steam', 'enemy_auto=1', 'guest_hits=1', 'boss_safe=1', 'guest_loot=1') {
+foreach ($key in 'enabled=1', 'transport=steam', 'enemy_auto=1', 'guest_hits=1',
+                 'boss_safe=1', 'guest_loot=1') {
     if ($iniText -notmatch [regex]::Escape($key)) { throw "cdmp.ini is missing '$key'" }
 }
 
