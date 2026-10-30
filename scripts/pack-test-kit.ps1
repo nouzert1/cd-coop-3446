@@ -186,6 +186,23 @@ function Set-IniKey([string[]]$lines, [string]$section, [string]$key, [string]$v
 
 # The two-PC test is over Steam. Anything else cannot leave this machine.
 $iniLines = Set-IniKey $iniLines 'net' 'transport' 'steam'
+
+# --- the host's SteamID, so the guest needs no room code -------------------
+#
+# The room code changes every time the host restarts the game (the lobby id
+# increments: 109775242893225821, ...94486749, ...95229575 across three launches),
+# so a kit that ships a code is stale the moment the host reopens the game, and
+# the friend has to edit the INI each time.
+#
+# [steam] peer_steamid does not change. The guest connects straight to that
+# account, and mod.cpp:265 uses it before the code path, so an empty [room] code
+# is correct. The "only friend playing" scan stays as the fallback.
+#
+# Both sides do NOT set this: on the host an empty value means "accept any friend
+# playing", which is what we want, so only the guest's INI carries it.
+$host_steam_id = '76561199441047799'
+$iniLines = Set-IniKey $iniLines 'steam' 'peer_steamid' $host_steam_id
+
 # The master switch, and it MUST be listed first of the coop keys.
 #
 # [coop] enabled is the one key that decides whether the other player appears at
@@ -499,15 +516,166 @@ if ($head.Length -lt 2 -or $head[0] -ne 0xFF -or $head[1] -ne 0xFE) {
 # to catch exactly this class of mistake -- did not look at it.
 $iniText = Get-Content $iniPath -Encoding Unicode -Raw
 foreach ($key in 'enabled=1', 'transport=steam', 'enemy_auto=1', 'guest_hits=1',
-                 'boss_safe=1', 'guest_loot=1') {
+                 'boss_safe=1', 'guest_loot=1', "peer_steamid=$host_steam_id") {
     if ($iniText -notmatch [regex]::Escape($key)) { throw "cdmp.ini is missing '$key'" }
 }
+
+# The guide is generated below, so it can only be missing if that block was
+# removed -- but it is the first thing the friend opens, so assert it is there.
+if (-not (Test-Path (Join-Path $kit 'LEIA-ME.txt'))) { throw 'LEIA-ME.txt is missing' }
 
 $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
     $h = (Get-FileHash (Join-Path $kit $f) -Algorithm SHA256).Hash
     '{0}  {1}' -f $h, $f
 }
 $lines | Set-Content -Path (Join-Path $kit 'SHA256SUMS.txt') -Encoding ASCII
+
+# --- the Portuguese quick-start -------------------------------------------
+#
+# The friend is Brazilian and the English LEIA-ME is not what he will read. This
+# is written here, by the packer, so a repack cannot lose it: an earlier kit was
+# rebuilt and the guide simply vanished, because it had been added to the output
+# folder by hand and this script wipes that folder on every run.
+@"
+==========================================================
+  MOD CO-OP CRIMSON DESERT - GUIA RAPIDO (PORTUGUES)
+==========================================================
+
+VOCE E O CONVIDADO (QUEM VAI VISITAR O MUNDO DO AMIGO).
+
+----------------------------------------------------------
+PASSO 1 - BACKUP DO SEU SAVE (1 MINUTO, FACA ISSO)
+----------------------------------------------------------
+
+  1. Aperte Win+R, cole isto e aperte Enter:
+        %LOCALAPPDATA%\Pearl Abyss\CD
+  2. Copie a pasta "save" para a Area de Trabalho.
+
+Se algo der errado, voce restaura essa pasta e volta ao normal.
+
+----------------------------------------------------------
+PASSO 2 - INSTALAR (3 arquivos)
+----------------------------------------------------------
+
+  1. No Steam: botao direito em Crimson Desert > Gerenciar >
+     Procurar arquivos locais. Abra a pasta "bin64".
+
+  2. Copie estes 3 arquivos PARA DENTRO de bin64:
+
+        cdmp.asi
+        cdmp.ini
+        dinput8.dll   ->  RENOMEIE para:  winmm.dll
+
+     O terceiro PRECISA ser renomeado para winmm.dll. Se ficar
+     "dinput8.dll" ele nao carrega e nada funciona.
+
+     Se a pasta bin64 JA TIVER um winmm.dll, PARE e me avise.
+
+----------------------------------------------------------
+PASSO 3 - NAO PRECISA EDITAR NADA
+----------------------------------------------------------
+
+  O cdmp.ini ja vem pronto. Confira so que tem:
+
+        [net]    role=guest
+        [steam]  peer_steamid=76561199441047799
+        [coop]   enabled=1
+        [room]   code=            <- VAZIO, de proposito
+
+  [coop] enabled=1 e o interruptor principal: e o que faz o
+  personagem do seu amigo APARECER no seu mundo. Se ficar 0,
+  voces conectam mas voce NAO ve o boneco dele.
+
+  [room] code fica vazio: o mod acha o anfitriao sozinho pelo
+  SteamID acima, entao voce nao precisa de codigo novo cada vez
+  que ele abre o jogo.
+
+----------------------------------------------------------
+PASSO 4 - ABRIR O JOGO E CONFERIR
+----------------------------------------------------------
+
+  1. Abra o Crimson Desert e carregue seu save.
+  2. Painel no canto superior esquerdo (F8 mostra/esconde).
+  3. Deve aparecer:
+        Network: connected to 'Nouzert SKINS' (XX ms)
+     Depois:
+        Other player: HP xxxx/xxxx   XX m away
+
+  4. SE O PAINEL NAO APARECER: veja se cdmp.log foi criado em
+     bin64. Se nao existe, o mod nao carregou -- quase sempre
+     porque o arquivo nao foi renomeado para winmm.dll.
+
+  "Room code: (no code: room: idle)" e NORMAL no seu lado:
+  quem cria a sala e o anfitriao, nao voce.
+
+----------------------------------------------------------
+COMO SABER SE ESTA FUNCIONANDO
+----------------------------------------------------------
+
+  Conectar NAO e o mesmo que funcionar. Chegue PERTO do seu
+  amigo e olhe:
+    - A distancia fica pequena (10-30 m)?
+    - Voce VE o personagem dele andando no mundo?
+
+  As duas coisas precisam ser sim. Se a distancia acompanha
+  seus movimentos mas voce nao ve o boneco, me avise.
+
+----------------------------------------------------------
+REGRAS DURANTE O TESTE
+----------------------------------------------------------
+
+  1. NINGUEM salva enquanto o outro estiver no mundo. Essa e a
+     forma mais provavel de estragar um save.
+  2. Nao apague o cdmp.log: ele e o objetivo do teste.
+  3. Se o anfitriao pedir, aperte Ctrl+F12 junto com ele.
+
+----------------------------------------------------------
+PARA DESINSTALAR
+----------------------------------------------------------
+
+  Apague winmm.dll, cdmp.asi e cdmp.ini de bin64.
+
+----------------------------------------------------------
+O QUE JA ESTA LIGADO
+----------------------------------------------------------
+
+  * EXPLORACAO: voces se veem e andam juntos. Teste isso 1o.
+  * LOOT COMPARTILHADO: ajude a matar um inimigo do anfitriao e
+    voce ganha o SEU drop, sem mexer nas suas missoes ou XP.
+    Precisa ter batido no inimigo; vale ate 30 m.
+  * SEGURANCA DO CHEFE: voce causa dano e ajuda, mas o golpe
+    final e sempre do anfitriao -- se voce matar, a missao dele
+    trava. Voce ve a barra de vida do chefe no painel.
+
+----------------------------------------------------------
+O QUE AINDA NAO FUNCIONA (honesto)
+----------------------------------------------------------
+
+  Chefes em conjunto estao pela METADE: voce ve e machuca o
+  chefe, mas a SUA missao nao avanca e ele nao dropa loot para
+  voce. Seu mundo nunca teve aquele chefe.
+
+----------------------------------------------------------
+MENSAGENS QUE VOCE PODE VER
+----------------------------------------------------------
+
+  "Different mod versions: both of you update"
+     Os cdmp.asi sao diferentes: um dos dois nao instalou o
+     arquivo deste mesmo ZIP. Os DOIS precisam usar este ZIP.
+
+  "Camera: camera block sentinel mismatch"
+     Inofensivo. Diagnostico que o patch do jogo moveu de
+     lugar. Custa so o nome flutuante na tela.
+
+----------------------------------------------------------
+RESUMO
+----------------------------------------------------------
+
+  1. Backup do save
+  2. 3 arquivos em bin64 (renomear dinput8.dll -> winmm.dll)
+  3. Nao editar nada
+  4. Abrir o jogo e ver se o painel diz "connected"
+"@ | Set-Content -Path (Join-Path $kit 'COMECE-AQUI-PORTUGUES.txt') -Encoding UTF8
 
 # --- zip ------------------------------------------------------------------
 $zip = Join-Path $dist 'cdmp-3446-test-kit.zip'
