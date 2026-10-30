@@ -66,16 +66,35 @@ inline constexpr uintptr_t kStaticPlayerPos = 0x71BDC10;  // 2976:0x6D77858 (vmo
 // of exactly 1, a valid TypeDescriptor RVA, and a name starting ".?A". A wrong
 // slot costs the feature, not the session. Code addresses (functions and
 // vtables) do NOT follow this delta and are marked separately.
-inline constexpr uintptr_t kClientClock = 0x1416B80;  // TODO(port): code, not data
-// Still the 2976 address: it cannot be resolved offline. Its head embeds a
-// RIP-relative displacement that changes every build, so the 2976 bytes match
-// nothing here (0 occurrences in the image), and re-matching by shape is no
-// better -- "cmp byte [rip+d],0 / jne +0x17" occurs 9 times. game_clock.cpp
-// compares this head against live memory and switches time sync off when it does
-// not match, which is what happens on 3424 today.
+// Unresolved: the 3424 address of the clock getter itself. Only used to re-read
+// the head, and the 2976 head cannot match here, so client_game_clock_ms() returns
+// nullopt before touching anything and time sync stays off. Harmless.
+inline constexpr uintptr_t kClientClock = 0x1416B80;  // TODO(port): code, 2976 value
 inline constexpr uint8_t kClientClockHead[] = {0x80, 0x3D, 0xAE, 0x61, 0x87, 0x05, 0x00, 0x75, 0x17};
-inline constexpr uintptr_t kClientFrameClockMs = 0x70D2628;  // INFERRED 2976:0x6C8CD68
-inline constexpr uintptr_t kClientFrameClockUs = 0x70D2630;  // INFERRED 2976:0x6C8CD70
+// The 2976 head is preserved above only as a record of what was searched for. Its
+// displacement is a 2976 RVA and cannot match here.
+//
+// RESOLVED, not inferred. The 2976 head decodes to "test the byte at 2976
+// 0x6C8CD34", which is the flag the clock getter consults. Looking for that shape
+// on 3424 and disassembling the hits (tools/probe, `disasm`) turned up four sites
+// doing exactly that against 3424 rva 0x70CACAD, sharing the same inlined body
+// (mov edx,0x1EB / gs:[0x58] / cmp). verify-port.ps1 re-derives those four
+// displacements from the image on every run, so the flag is verified, not trusted.
+inline constexpr uintptr_t kClientClockGlobal = 0x70CACAD;  // 2976:0x6C8CD34, delta 0x43DF79 (found)
+// ASSUMED, not verified: the two clock fields keep their 2976 distances from the
+// flag (+0x34 and +0x3C). The flag itself is proven; the intra-struct gaps are not,
+// and they cannot be checked offline because the whole region is zero-filled in the
+// file. Note what this costs if the guess is wrong: reading two adjacent u64s that
+// are not the clock yields values that fail the sanity checks in
+// client_game_clock_ms() (>30 days, or us >= 1e6) and time sync stays off -- the
+// same outcome as before this change, so the guess cannot make anything worse.
+//
+// Also note these are NOT 8-byte aligned: the flat constant happened to land on
+// aligned addresses, which is why an earlier alignment assertion passed. The 2976
+// layout has ms at flag+0x34 and us at flag+0x3C, neither a multiple of 8, so
+// "aligned" was never a property of this struct. Alignment is not evidence here.
+inline constexpr uintptr_t kClientFrameClockMs = 0x70CACE1;  // 2976:0x6C8CD68 (= flag + 0x34)
+inline constexpr uintptr_t kClientFrameClockUs = 0x70CACE9;  // 2976:0x6C8CD70 (= flag + 0x3C)
 inline constexpr uintptr_t kClientClockBias = 0x71AECF8;     // INFERRED 2976:0x6D69438
 // The client's copy of the time of day, pa::FieldTime (32 bytes; field_time.h,
 // hora-del-dia.md section 8). The server's copy was at 0x6A6D238.

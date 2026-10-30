@@ -20,6 +20,10 @@
 #include <string>
 #include <vector>
 
+#ifdef CDMP_PROBE_HAVE_ZYDIS
+#include <Zydis/Zydis.h>
+#endif
+
 #include "common/pattern.h"
 #include "probe/process.h"
 
@@ -48,6 +52,7 @@ void usage() {
         "  chain <addr> [off ...] [--type T]    Cheat Engine style [[addr]+off]+off...\n"
         "  watch <addr> [off ...] [--type T] [--interval MS] [--seconds N]\n"
         "  dump <addr> [--size N]               qword view with floats, pointers, RTTI\n"
+        "  disasm <addr> [--count N]            decode instructions, resolving RIP targets\n"
         "  rtti <addr>                          class name of the object at addr\n"
         "  classes <text> [--max N]             RTTI class names containing text\n"
         "  vtables <.?AVName@@>                 vtable address(es) of an RTTI class\n"
@@ -407,8 +412,84 @@ int cmd_dump(const Process& p, const Args& a) {
     return 0;
 }
 
-int cmd_rtti(const Process& p, const Args& a) {
+// Decode instructions starting at an address. This is how a code address gets
+// IDENTIFIED rather than guessed: a byte pattern says "some function looks like
+// this", whereas reading the body says which global it touches and what it does.
+// RIP-relative operands are resolved inline, so a `cmp byte [rip+d],0` shows the
+// absolute address it tests -- exactly the link needed to tie a code site to a
+// data slot.
+int cmd_disasm(const Process& p, const Args& a) {
     if (a.pos.size() < 2) return usage(), 2;
+    auto addr = parse_addr(p, a.pos[1]);
+    if (!addr) return std::puts("Bad address"), 2;
+#ifndef CDMP_PROBE_HAVE_ZYDIS
+    std::puts("Built without Zydis; disassembly unavailable.");
+    return 2;
+#else
+    const size_t count = parse_count(a.get("--count", "40"), 40);
+    const uint64_t start = *addr;
+    // Read a window big enough for the instruction count.
+    std::vector<uint8_t> code(count * 16 + 16);
+    if (!p.read(start, code.data(), code.size())) {
+        std::puts("Cannot read code at that address");
+        return 1;
+    }
+    ZydisDecoder dec;
+    if (!ZYAN_SUCCESS(ZydisDecoderInit(&dec, ZYDIS_MACHINE_MODE_LONG_64,
+                                       ZYDIS_STACK_WIDTH_64))) {
+        std::puts("Zydis init failed");
+        return 1;
+    }
+    ZydisFormatter fmt;
+    ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
+
+    size_t off = 0;
+    for (size_t i = 0; i < count && off < code.size(); ++i) {
+        ZydisDecodedInstruction insn;
+        ZydisDecodedOperand ops[ZYDIS_MAX_OPERAND_COUNT];
+        if (!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&dec, code.data() + off,
+                                                 code.size() - off, &insn, ops))) {
+            std::printf("%-18s db %02X\n", p.describe(start + off).c_str(), code[off]);
+            ++off;
+            continue;
+        }
+        char text[256] = {};
+        ZydisFormatterFormatInstruction(&fmt, &insn, ops, insn.operand_count_visible, text,
+                                        sizeof text, start + off, nullptr);
+        std::string note;
+        // Resolve any RIP-relative memory operand to an absolute address, and say
+        // whether it lands in the image and what is there.
+        for (int k = 0; k < insn.operand_count_visible; ++k) {
+            const ZydisDecodedOperand& op = ops[k];
+            if (op.type != ZYDIS_OPERAND_TYPE_MEMORY) continue;
+            if (op.mem.base != ZYDIS_REGISTER_RIP) continue;
+            const uint64_t target = start + off + insn.length +
+                                    static_cast<uint64_t>(op.mem.disp.value);
+            note = std::format("   -> {}", p.describe(target));
+            if (p.is_readable(target)) {
+                uint8_t b = 0;
+                if (p.read(target, &b, 1)) note += std::format(" (byte {})", b);
+            } else {
+                note += " (in zero-filled memory; loaded only at runtime)";
+            }
+        }
+        // A call through a register or memory is worth flagging: it is often a
+        // virtual dispatch or an import.
+        if (insn.mnemonic == ZYDIS_MNEMONIC_CALL && insn.operand_count_visible == 1 &&
+            ops[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+            const uint64_t target = ops[0].imm.is_relative
+                                        ? start + off + insn.length + ops[0].imm.value.s
+                                        : static_cast<uint64_t>(ops[0].imm.value.u);
+            note += std::format("   call {}", p.describe(target));
+        }
+        std::printf("%-18s %-46s%s\n", p.describe(start + off).c_str(), text, note.c_str());
+        off += insn.length;
+    }
+    return 0;
+#endif
+}
+
+int cmd_rtti(const Process& p, const Args& a) {    if (a.pos.size() < 2) return usage(), 2;
     auto addr = parse_addr(p, a.pos[1]);
     if (!addr) return std::puts("Bad address"), 2;
     const std::string cls = p.rtti_name(*addr);
@@ -508,8 +589,8 @@ int main(int argc, char** argv) {
         const std::string& c = a.pos[0];
         if (c == "chain" || c == "watch" || c == "rtti") {
             std::printf("'%s' needs live memory (a running game); --image only reads the file.\n"
-                        "Commands that work with --image: info scan sigs rip read dump classes "
-                        "vtables findptr\n", c.c_str());
+                        "Commands that work with --image: info scan sigs rip read dump disasm "
+                        "classes vtables findptr\n", c.c_str());
             return 2;
         }
         if (a.flag("--heap")) {
@@ -536,6 +617,7 @@ int main(int argc, char** argv) {
     if (cmd == "chain") return cmd_chain(p, a);
     if (cmd == "watch") return cmd_watch(p, a);
     if (cmd == "dump") return cmd_dump(p, a);
+    if (cmd == "disasm") return cmd_disasm(p, a);
     if (cmd == "rtti") return cmd_rtti(p, a);
     if (cmd == "classes") return cmd_classes(p, a);
     if (cmd == "vtables") return cmd_vtables(p, a);

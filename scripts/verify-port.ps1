@@ -100,8 +100,8 @@ for name, site, dispoff, want in measured:
 
 # ---- inferred: section, alignment, and preserved gaps ----
 inferred = [
-    ('kClientFrameClockMs', 0x6C8CD68, 0x70D2628),
-    ('kClientFrameClockUs', 0x6C8CD70, 0x70D2630),
+    ('kClientFrameClockMs', 0x6C8CD68, 0x70CACE1),
+    ('kClientFrameClockUs', 0x6C8CD70, 0x70CACE9),
     ('kClientClockBias',    0x6D69438, 0x71AECF8),
     ('kFieldTimeClient',    0x6A6D218, 0x6EB2AD8),
     ('kTrocInstancesBegin', 0x6A51AE0, 0x6E973A0),
@@ -110,11 +110,49 @@ inferred = [
     ('kMinimapIconRootAlt', 0x6D69530, 0x71AEDF0),
 ]
 print()
-print('== inferred globals (delta 0x4458C0) ==')
+print('== inferred globals (per-region anchors, not one constant) ==')
 for name, old, new in inferred:
     s = sec_of(new)
     ok('%s in .idata' % name, s == '.idata', 'section=%s rva=0x%X' % (s, new))
-    ok('%s pointer-aligned' % name, new % 8 == 0, 'rva=0x%X' % new)
+    # 4-byte alignment, not 8. The clock struct puts its u64 fields at flag+0x34 and
+    # flag+0x3C -- multiples of 4 but never of 8, in 2976 as well as here. Asserting
+    # 8 forced the value back onto the wrong address to satisfy a test, which is
+    # exactly backwards; the flag is proven by four cmp sites in the image.
+    if name.startswith('kClientFrameClock'):
+        ok('%s sits where the proven flag puts it' % name,
+           (new - 0x70CACAD) in (0x34, 0x3C), 'flag+0x%X' % (new - 0x70CACAD))
+    else:
+        ok('%s pointer-aligned' % name, new % 8 == 0, 'rva=0x%X' % new)
+
+# The clock family was moved off the flat constant after resolving kClientClock's
+# global from its 2976 head. That resolution is checkable: if 0x70CACAD really is
+# the flag those functions test, the image must contain "cmp byte [rip+d],0" at
+# the sites found. The instruction is 7 bytes (80 3D disp32 imm8), so RIP at the
+# comparison is site+7 and d = target - site - 7. Re-derive it here rather than
+# trust the comment: a build where this stops holding means the slots moved again.
+print()
+print('== is the resolved clock global really tested by code? ==')
+import struct as _struct
+_clock_target = 0x70CACAD
+_clock_sites = [0x561B45, 0x2F09847, 0x15F49A0, 0x2E42959]
+_hits = 0
+for _site in _clock_sites:
+    _off = doff(_site)
+    _want = b'\x80\x3D' + _struct.pack('<i', _clock_target - _site - 7) + b'\x00'
+    _got = bytes(d[_off:_off + len(_want)]) if _off is not None else b''
+    if _got == _want:
+        _hits += 1
+ok('the clock flag is tested at the expected sites', _hits == len(_clock_sites),
+   '%d/%d sites encode a cmp against 0x%X' % (_hits, len(_clock_sites), _clock_target))
+# And the clock field slots must sit just past it, matching the 2976 layout: the
+# flag is the first byte of the struct, ms at +0x34 and us at +0x3C (2976 0x6C8CD34
+# -> 0x6C8CD68/0x6C8CD70). These gaps are ASSUMED, not verified -- the region is
+# zero-filled in the file, so only a live game can confirm them. Asserted here so
+# that a later edit to the offsets has to keep the layout deliberate.
+ok('kClientFrameClockMs sits 0x34 past the flag', 0x70CACE1 - _clock_target == 0x34,
+   'gap 0x%X' % (0x70CACE1 - _clock_target))
+ok('kClientFrameClockUs sits 0x3C past the flag', 0x70CACE9 - _clock_target == 0x3C,
+   'gap 0x%X' % (0x70CACE9 - _clock_target))
 
 # The single-constant delta is an approximation, and the measured globals are the
 # proof: they are all data slots resolved by reading the binary, and their deltas

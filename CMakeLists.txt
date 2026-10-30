@@ -144,6 +144,17 @@ add_executable(cdmp_probe tools/probe/main.cpp tools/probe/process.cpp)
 cdmp_strict(cdmp_probe)
 target_include_directories(cdmp_probe PRIVATE tools)
 target_link_libraries(cdmp_probe PRIVATE cdmp_common)
+# The `disasm` command decodes instructions, which is how a code address gets
+# identified from its body rather than guessed from a byte pattern. Zydis comes in
+# with safetyhook; link it only if it is actually there so the probe still builds
+# when the mod is not configured.
+if(TARGET Zydis)
+    target_link_libraries(cdmp_probe PRIVATE Zydis)
+    target_compile_definitions(cdmp_probe PRIVATE CDMP_PROBE_HAVE_ZYDIS=1)
+    if(TARGET Zycore)
+        target_link_libraries(cdmp_probe PRIVATE Zycore)
+    endif()
+endif()
 
 # Tests.
 enable_testing()
