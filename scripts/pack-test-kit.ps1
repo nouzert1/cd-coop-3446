@@ -550,6 +550,17 @@ $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
 }
 $lines | Set-Content -Path (Join-Path $kit 'SHA256SUMS.txt') -Encoding ASCII
 
+# What the friend checks to know he installed THIS kit and not an older one.
+#
+# A version mismatch is the single most confusing failure this mod has: everything
+# connects, the distance updates, and no character appears -- so the test looks
+# almost-working and the actual cause is invisible. Printing both the build id (what
+# the panel shows) and the file hash (what Windows shows) turns that into a
+# two-second check, and means an out-of-date download is caught before a test.
+$build_id_upper = if ($built) { $built.ToUpper() } else { '(unknown)' }
+$asi_hash = (Get-FileHash (Join-Path $kit 'cdmp.asi') -Algorithm SHA256).Hash
+$steam_line = if ($HostSteamId) { $HostSteamId } else { '(vazio: conecta no unico amigo jogando)' }
+
 # --- the Portuguese quick-start -------------------------------------------
 #
 # The friend is Brazilian and the English LEIA-ME is not what he will read. This
@@ -598,7 +609,7 @@ PASSO 3 - NAO PRECISA EDITAR NADA
   O cdmp.ini ja vem pronto. Confira so que tem:
 
         [net]    role=guest
-        [steam]  peer_steamid=<SteamID64 do anfitriao>
+        [steam]  peer_steamid=$steam_line
         [coop]   enabled=1
         [room]   code=            <- VAZIO, de proposito
 
@@ -627,6 +638,30 @@ PASSO 4 - ABRIR O JOGO E CONFERIR
 
   "Room code: (no code: room: idle)" e NORMAL no seu lado:
   quem cria a sala e o anfitriao, nao voce.
+
+----------------------------------------------------------
+CONFIRA A VERSAO (a causa mais comum de nao funcionar)
+----------------------------------------------------------
+
+  A primeira linha do painel diz qual versao voce instalou:
+
+        Crimson Desert Multiplayer 0.2.0 (build XXXXXXXXX)
+
+  O build TEM QUE SER:  $build_id_upper
+
+  Se aparecer outro numero, voce esta com um ZIP antigo e o
+  co-op NAO funciona: o mod compara a versao ao conectar e
+  RECUSA criar o personagem quando elas diferem. O sintoma e
+  exatamente esse -- voce VE a distancia no painel, porque a
+  troca de posicao funciona, mas nunca ve o boneco.
+
+  Foi o que aconteceu no teste anterior: anfitriao 2BE49E66,
+  convidado 1B7B429D, tudo conectado e nenhum personagem.
+
+  Para conferir o arquivo em si: botao direito no cdmp.asi >
+  Propriedades > Hash do arquivo. SHA256 esperado:
+
+        $asi_hash
 
 ----------------------------------------------------------
 COMO SABER SE ESTA FUNCIONANDO
