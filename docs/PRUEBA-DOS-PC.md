@@ -38,6 +38,29 @@ Ctrl+F12 at each step and at each odd thing, as always. Nobody saves.
 4. If on entering you get the red warning "Different mod versions", stop: one of you
    does not have the right zip.
 
+### Connecting with the room code (this is the normal way now)
+
+The profiles use `transport=steam`, and there is a `[room] code=` key. Nobody
+needs to look up a SteamID64 or open a port.
+
+- **A (host):** leave `code=` **empty**. A creates the room and the panel (F8)
+  shows a line like `Room code: 000Y4G6`. Read it out.
+- **I (guest):** put A's code in `[room] code=`. Lower case and dashes are fine
+  (`00oy-4g6` works). Everything goes through Steam.
+
+Then:
+
+1. A starts the game and loads the save first. Wait for A's code to appear.
+2. I starts the game and loads the save. Give it up to a minute.
+3. `cdmp.log` on the guest says `Room: looking for the host of room …`, then
+   either `room … found; connecting to the host` or `not found yet; keep the
+   host's game open and the lobby alive, we keep trying`. That last line means
+   the lookup is still running, not that it failed.
+
+Before anything else, both confirm the mod loaded at all: **`cdmp.log` exists in
+`bin64` and the panel is there.** If not, stop - the connection steps cannot
+help, and the cause is almost always `dinput8.dll` not renamed to `winmm.dll`.
+
 ## A. Connection and the basics (10 min)
 
 | Step | Who | What | What to look at |
@@ -74,6 +97,46 @@ the same place (they are not removed yet). If you can, pick a group that I has a
 | C4 | I | Let A's enemies kill them | I dies with their normal animation and respawns |
 | C5 | A | Fast travel in the middle of combat | On I, the copies disappear |
 | C6 | I | Fast travel in the middle of combat and come back | That no frozen copies are left |
+
+## C2b. Shared loot - "each takes their own" (15 min)
+
+This is the feature where I gets their own drop from a creature A's world owns.
+It needs `enemy_auto=1`, `guest_hits=1` and `guest_loot=1`; the kit's profiles
+set all three. **A** does not need `guest_loot` (the enemies are already theirs).
+
+| Step | Who | What | What to look at |
+|---|---|---|---|
+| L1 | A | Find 2-4 plain enemies. Confirm I's panel and A's panel both show the relay on | If `cdmp.log` says shared loot can never fire (`enemy_auto=0`), stop and fix the profile |
+| L2 | I | **Hit one of the copies at least once**, then let A finish it | The point: a creature I never touched must give I nothing, by design |
+| L3 | I | Look for a corpse near where the copy died, and loot it | I gets **their own** drop. On A, A gets theirs. Two separate drops from one kill |
+| L4 | I | Check the quest log and XP before/after | I's own quests must be **untouched**. Loot and XP from the twin, no quest advance |
+| L5 | I | Kill one copy **alone**, without A touching it | On A the real enemy must not die; the twin only exists for kills A's world also had |
+| L6 | Both | Note the other player's distance when it fires | Only within 30 m of I, or I gets nothing (with a line in the log saying why) |
+
+If I gets nothing, `cdmp.log` says which condition failed ("we are too far from
+it", the variant is excluded, or the rate limit). Send that line - it names the
+cause.
+
+## C2c. Boss safety (15 min)
+
+The rule: **the guest must never land the killing blow on a boss.** A boss is a
+scripted stage that A's client runs; a guest kill ends it outside the script and
+A's quest sticks behind the arena barrier. With `boss_safe=1` (default), I still
+does damage and still helps.
+
+| Step | Who | What | What to look at |
+|---|---|---|---|
+| J1 | A | Go to an **open-world** boss (`*_bossencounter_*`), not a quest/story boss | The safest first target: no barrier, no `noDie`, no loading screen |
+| J2 | Both | Fight it. I attacks hard | The boss's health drops from I's blows. I's panel shows a **boss bar** (the guest has no native one) |
+| J3 | I | Try to land the killing blow (hit it when it is nearly dead) | **A must get the kill.** `cdmp.log` on A says the boss "survived the finishing blow and is left alive for the host to finish" |
+| J4 | A | Kill it | The fight ends **normally**: the boss dies, the quest advances, **no barrier is left up** |
+| J5 | Both | If a cutscene starts, keep hitting | Nothing lands either way while A is in the cinematic; I's panel says to wait |
+| J6 | A | After the fight | **The host's quest is not stuck.** This is the whole point of the feature |
+
+**What is expected to be missing:** I's own quest is **not** advanced by the kill
+and the boss drops **nothing** for I, because that boss never existed in I's
+world. That is a known limit, not a bug - do not report it as one. Both worlds
+running their own copy of the fight is a much bigger job.
 
 ## D. Load (10 min)
 

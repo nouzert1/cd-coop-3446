@@ -16,6 +16,29 @@ foreach ($f in 'cdmp.asi', 'cdmp_peer.exe') {
 
 $stamp = Get-Date -Format 'yyyyMMdd'
 $staging = Join-Path $root "dist\cdmp-coop-$stamp"
+
+# The profiles under kit\ are hand-maintained copies of the mod's own defaults, so
+# they go stale whenever a co-op key is added: a profile missing a key silently
+# hands the player the default instead, with no sign that a choice ever existed.
+# That already happened once -- they had no [room], boss_safe, guest_loot,
+# enemy_auto or guest_hits. Check them before building anything.
+foreach ($prof in 'kit\coop\cdmp.ini.anfitrion', 'kit\coop\cdmp.ini.invitado',
+                  'kit\public\cdmp.ini.anfitrion', 'kit\public\cdmp.ini.invitado') {
+    $p = Join-Path $root $prof
+    if (-not (Test-Path $p)) { continue }
+    $text = Get-Content $p -Encoding Unicode -Raw
+    $missing = @()
+    foreach ($key in '[room]', 'boss_safe=', 'guest_loot=', 'enemy_auto=', 'guest_hits=', 'transport=steam', 'role=') {
+        if ($text -notmatch [regex]::Escape($key)) { $missing += $key }
+    }
+    if ($missing) {
+        throw ("{0} is stale: missing {1}. A key absent from a profile is invisible to the " +
+               "player, who silently gets the default. Regenerate the profiles from the mod's own " +
+               "defaults (run cdmp_host.exe once and copy the cdmp.ini it writes).") -f $prof, ($missing -join ', ')
+    }
+}
+Write-Host 'Kit profiles contain every co-op key.'
+
 if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 New-Item -ItemType Directory -Force $staging | Out-Null
 
