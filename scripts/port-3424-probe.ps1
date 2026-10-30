@@ -4,7 +4,7 @@
 # lá). O probe anexa com PROCESS_VM_READ apenas -- é read-only e não pode
 # travar nem modificar o jogo.
 #
-#   cd "C:\Users\ACER\Downloads\Mods\CD-coop-3424"
+#   cd <onde voce clonou o repositorio>
 #   .\scripts\port-3424-probe.ps1
 #
 # COM O JOGO FECHADO ele ainda faz a parte offline (--image): lê o .exe do disco e

@@ -6,12 +6,20 @@ silently returns 0 for an unparsable line produced a completely wrong value once
 
 Usage: live_read.py <rva-hex> [count] [--repeat N]
 """
+import os
 import re
 import subprocess
 import sys
 import time
 
-PROBE = r"C:\Users\ACER\Downloads\Mods\CD-coop-3424\build\bin\RelWithDebInfo\cdmp_probe.exe"
+# Relative to this file, so a clone works wherever it was checked out. It used to
+# be an absolute path under one machine's home directory, which meant the script
+# only ran on the machine it was written on.
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROBE = os.environ.get(
+    "CDMP_PROBE",
+    os.path.join(_ROOT, "build", "bin", "RelWithDebInfo", "cdmp_probe.exe"),
+)
 
 # One or more hex digits, not exactly two: the probe prints small values as
 # "(0x0)" and "(0x1)", and requiring two digits silently dropped them -- which

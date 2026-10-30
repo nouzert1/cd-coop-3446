@@ -10,7 +10,15 @@
 
 param(
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo')]
-    [string]$Config = 'RelWithDebInfo'
+    [string]$Config = 'RelWithDebInfo',
+
+    # The HOST's SteamID64, written into the guest's [steam] peer_steamid.
+    #
+    # Optional, and deliberately not defaulted: it identifies a real Steam account,
+    # so shipping one in the repository would be nobody's business but its owner's.
+    # Omitted, the guest falls back to connecting to the only friend playing
+    # Crimson Desert -- which is how the first working test connected anyway.
+    [string]$HostSteamId = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -200,8 +208,20 @@ $iniLines = Set-IniKey $iniLines 'net' 'transport' 'steam'
 #
 # Both sides do NOT set this: on the host an empty value means "accept any friend
 # playing", which is what we want, so only the guest's INI carries it.
-$host_steam_id = '76561199441047799'
-$iniLines = Set-IniKey $iniLines 'steam' 'peer_steamid' $host_steam_id
+#
+# The value is a PARAMETER, not a constant: it is a real person's SteamID, and a
+# hardcoded one in a public repository is somebody's account identifier sitting in
+# the source for no reason. Pass it when building your own kit:
+#
+#   .\scripts\pack-test-kit.ps1 -HostSteamId 7656119XXXXXXXXXX
+#
+# Left empty, the kit still works: [room] code= stays empty too, and the mod falls
+# back to the "only friend playing Crimson Desert" scan described in the README.
+$iniLines = Set-IniKey $iniLines 'steam' 'peer_steamid' $HostSteamId
+if (-not $HostSteamId) {
+    Write-Host 'No -HostSteamId given: the guest will connect via the "only friend playing" scan.'
+    Write-Host 'Pass -HostSteamId <SteamID64> to pin it to one account instead.'
+}
 
 # The master switch, and it MUST be listed first of the coop keys.
 #
@@ -578,7 +598,7 @@ PASSO 3 - NAO PRECISA EDITAR NADA
   O cdmp.ini ja vem pronto. Confira so que tem:
 
         [net]    role=guest
-        [steam]  peer_steamid=76561199441047799
+        [steam]  peer_steamid=<SteamID64 do anfitriao>
         [coop]   enabled=1
         [room]   code=            <- VAZIO, de proposito
 
@@ -597,7 +617,7 @@ PASSO 4 - ABRIR O JOGO E CONFERIR
   1. Abra o Crimson Desert e carregue seu save.
   2. Painel no canto superior esquerdo (F8 mostra/esconde).
   3. Deve aparecer:
-        Network: connected to 'Nouzert SKINS' (XX ms)
+        Network: connected to '<nome do anfitriao>' (XX ms)
      Depois:
         Other player: HP xxxx/xxxx   XX m away
 
