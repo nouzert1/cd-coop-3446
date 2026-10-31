@@ -567,6 +567,23 @@ $build_id_upper = if ($built) { $built.ToUpper() } else { '(unknown)' }
 $asi_hash = (Get-FileHash (Join-Path $kit 'cdmp.asi') -Algorithm SHA256).Hash
 $steam_line = if ($HostSteamId) { $HostSteamId } else { '(vazio: conecta no unico amigo jogando)' }
 
+# The protocol version, READ FROM THE SOURCE rather than written here.
+#
+# INSTALL.md tells the operator what the mod's first log line must say, and that line
+# contains the protocol version. It was hardcoded as 9 and stayed 9 after the protocol
+# moved to 10 -- so the document would have told the guest to expect a line the mod no
+# longer prints, at exactly the moment they are checking whether the install worked. That
+# is the worst place for a stale constant: the check is only run when something is already
+# suspected to be wrong.
+#
+# Reading it means the document cannot drift again, and if the pattern stops matching the
+# packer fails rather than shipping the wrong number.
+$version_source = Join-Path $root 'src\common\protocol.h'
+if (-not (Test-Path $version_source)) { throw "Missing $version_source" }
+$version_match = Select-String -Path $version_source -Pattern '^\s*inline constexpr uint16_t kVersion\s*=\s*(\d+)\s*;'
+if (-not $version_match) { throw "Cannot read kVersion from $version_source" }
+$protocol_version = $version_match.Matches[0].Groups[1].Value
+
 # The agent-facing install document.
 #
 # The guest is having an AI coding agent do the install, and the other texts in this
@@ -582,7 +599,7 @@ $steam_line = if ($HostSteamId) { $HostSteamId } else { '(vazio: conecta no unic
 $install_src = Join-Path $root 'kit\coop\INSTALL.md'
 if (-not (Test-Path $install_src)) { throw "Missing $install_src" }
 $install_text = Get-Content $install_src -Raw -Encoding UTF8
-$install_text = $install_text.Replace('{{BUILD_ID}}', $build_id_upper).Replace('{{ASI_SHA256}}', $asi_hash)
+$install_text = $install_text.Replace('{{BUILD_ID}}', $build_id_upper).Replace('{{ASI_SHA256}}', $asi_hash).Replace('{{PROTOCOL}}', $protocol_version)
 if ($install_text -match '\{\{') { throw 'INSTALL.md still has an unstamped placeholder' }
 # A stamp that silently expanded to nothing would produce a document telling the agent
 # to verify against an empty string, which passes any check. Assert it landed.

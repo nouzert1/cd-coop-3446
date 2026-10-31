@@ -150,7 +150,7 @@ Get-Content "$game\cdmp.log" -TotalCount 3
 The first line must read:
 
 ```
-=== Crimson Desert Multiplayer 0.2.0 (build {{BUILD_ID}}, protocol 9) ===
+=== Crimson Desert Multiplayer 0.2.0 (build {{BUILD_ID}}, protocol {{PROTOCOL}}) ===
 ```
 
 If `cdmp.log` does not exist at all, the mod did not load. The usual causes, in order:
