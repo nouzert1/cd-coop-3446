@@ -270,49 +270,84 @@ inline constexpr uintptr_t kControlInner_Physics = 0x2C0;  // 3446 value; NO LON
 inline constexpr uintptr_t kControlInner_Position = 0x460;
 
 
+// ---- the four remaining globals: MEASURED, AND MEASURED WRONG --------------
 //
-// These carry their 3446 values and are UNVERIFIED on 3460. The list shrank this round:
-// kWorldSystemSlot is now measured (above), and the chain from it to a position was
-// traced live, which incidentally confirms kWorldSystem_ActorManager, kActor_ComponentTable,
-// kComponents_CharacterControl, kActorManager_ControlledActor, kControl_Inner,
-// kControlInner_Physics and kPhysics_Position -- all the STRUCT offsets, which is what
-// the comment at the top of this file predicted (structure survives a patch; addresses
-// do not).
+// A sweep of [0x70C0000, 0x71D0000) -- the range where 3446 kept these -- was run against
+// the live game with the character walking, identifying each global by a property only the
+// real object can have (a float triple agreeing with the independently derived position; a
+// camera block carrying its exact sentinel; a target the game's own RTTI calls a
+// MinimapIcon; an int64 bias landing the frame clock near wall time). It returned:
 //
-// WHAT WENT WRONG EARLIER, recorded so it is not repeated. An earlier revision of this
-// comment claimed cdmp_probe contradicts itself. That was WRONG. The probe works; the
-// calls were bad. Two specific traps, both hit in this port:
-//   * `troc --begin X --end Y` is silently ignored -- the arguments are POSITIONAL. The
-//     default range was swept and returned 0, which read as "the handler array moved
-//     somewhere unknown". It had moved by +0x4000, and was found as soon as the call
-//     was written correctly.
-//   * `xrefs` reports the address of the SHIFTED OPERAND, not the instruction start.
-//     Three "sites" for one global were one instruction counted three ways.
-// Both produced confident, specific, wrong numbers. A tool that reports a fact about
-// the game when the defect is in the call is the single most expensive failure mode in
-// this project.
+//   Global probe: reference position (-20717.33, 620.17, -6914.66)
+//   Global probe: 0 position, 0 camera, 0 minimap, 0 clockbias candidate(s)
 //
-// kStaticPlayerPos deserves a specific warning. Read as f32 it returns -88.3066, which
-// LOOKS like a coordinate; `dump` shows the bytes are pointers, and following them
-// yields nothing that is a position. The plausible-looking float was a coincidence of
-// bit patterns. Do not accept a value because it resembles the thing you wanted.
+// That is a real result, not a broken sweep: direct reads across the range succeed
+// (0x71B5CF0 returns a live pointer, 0x71B1A40 returns the GlobalVariableManager), so the
+// sweep had both a valid reference and working reads. What the addresses hold today is the
+// finding, and each one is wrong in a way you can see:
 //
-// HOW TO SETTLE THE REST. Through the mod, not the probe. PlayerReader computes
-// `static_pos_error` -- the distance between the position it derives from the chain and
-// this global (player_reader.cpp:122-124) -- printed as `check vs game global {:.2f} m`.
-// A correct chain reports centimetres. That number is self-checking: it compares two
-// independent derivations, so it does not depend on any external tool agreeing.
-inline constexpr uintptr_t kWorldSystemSlot = 0x71B5CF0;  // measured live; 3446:0x71B1A40
-inline constexpr uintptr_t kCameraSlot = 0x70CDEA8;       // 3446 value, UNVERIFIED on 3460
-inline constexpr uintptr_t kStaticPlayerPos = 0x71C0C20;  // 3446 value, UNVERIFIED (see above)
-inline constexpr uintptr_t kChunkOrigin = 0x719DCA0;      // 3446 value, UNVERIFIED on 3460
-inline constexpr uintptr_t kMinimapIconRoot = 0x71B1DD8;     // 3446 value, UNVERIFIED
-inline constexpr uintptr_t kMinimapIconRootAlt = 0x71B1DE0;  // 3446 value, UNVERIFIED
-inline constexpr uintptr_t kClientClockBias = 0x71B1CE8;     // 3446 value, UNVERIFIED
-inline constexpr uintptr_t kClientClockGlobal = 0x70CDCAD;   // 3446 value, UNVERIFIED
-inline constexpr uintptr_t kClientFrameClockMs = 0x70CDCE1;  // = flag + 0x34
-inline constexpr uintptr_t kClientFrameClockUs = 0x70CDCE9;  // = flag + 0x3C
-inline constexpr uintptr_t kClientClock = 0x1416B80;         // 3446 value, UNVERIFIED
+//   0x70CDEA8  kCameraSlot        "common.v" (UTF-16 text)   -- a string, not a pointer
+//   0x71B1DD8  kMinimapIconRoot   0xFFFF                    -- not a pointer
+//   0x71B1DE0  kMinimapIconRootAlt 0x0                      -- null
+//   0x70CDCE1  kClientFrameClockMs 0xB000000000000200       -- junk
+//   0x71C0C20  kStaticPlayerPos   two pointers              -- not floats
+//
+// NOTHING IS MERELY DISPLACED. There is no delta to apply: the system objects LEFT this
+// range. Where 3446 kept the game's world, 3460 keeps config strings, flag tables and other
+// data. This is the same phenomenon seen at kWorldSystemSlot, so it is confirmed twice
+// rather than inferred once.
+//
+// These are left at their 3446 values rather than zeroed, because zeroing would look like a
+// deliberate "unavailable" marker and would be a lie about what is known. They are marked
+// WRONG so the next person does not read them as merely unverified.
+//
+// WHAT BREAKS, and it fails closed in all three cases:
+//   * guest camera  -- read_ptr on a string returns nothing, so the reader reports
+//     "no camera" instead of producing a wrong camera.
+//   * time sync     -- four guards in series (inside the image, ms != 0, ms under a year,
+//     us under 1e9); any failure returns nullopt and the feature turns itself off.
+//   * minimap icon  -- simply not drawn.
+// WHAT DOES NOT BREAK: position, health, stamina, actor rotation, and the whole network
+// path. "Local player: in world" with a correct position was re-verified in the same run
+// that produced the zeros above.
+//
+// A MISALIGNMENT WORTH SEEING. The clock's microsecond counter starts one byte earlier than
+// the table says:
+//     0x70CDCE8: 0x2748813B0
+//     0x70CDCE9: 0x0002748813      <-- what the table reads
+// The mod reads a byte-shifted value and happens to get a number that PASSES its own guard
+// (< 1e9). That is the failure mode worth remembering: a check written against the right
+// value read from the wrong place will not catch itself.
+//
+// HOW TO SETTLE THEM, if these features matter again. Not "apply a delta" and not "sweep
+// further". Find each object by its CONSTRUCTOR -- locate the function that writes the slot
+// on 3446 and re-find it on 3460 by prologue, since a writer is more stable than a reader
+// and the address it writes is in the instruction. Or, cheaper: discover whether 3460 still
+// has these objects at all by scanning the heap for their RTTI names (MinimapIcon, Camera),
+// the way the live ClientActorManager was found -- if the objects exist, the slot that
+// references them is findable from what points at them.
+//
+// DO NOT retry "the .data section did not move because these addresses still have xrefs".
+// That reasoning produced a wrong conclusion earlier in this port, and the xref count was
+// identical on both builds.
+//
+// WHAT REPLACES THE OLD CONTROL. kStaticPlayerPos was the intended self-check -- derived
+// position against a second global. It cannot serve that role while it is wrong, so the
+// working control is now VERIFICATION BY MOTION: two reads with the player walking must
+// differ along the direction of travel. That is how kControlInner_Position was proved
+// (~45 m between reads), and it is strictly stronger, because it does not depend on any
+// second global being correct -- it is immune to exactly the failure that broke this one.
+inline constexpr uintptr_t kWorldSystemSlot = 0x71B5CF0;  // MEASURED live; 3446:0x71B1A40
+inline constexpr uintptr_t kCameraSlot = 0x70CDEA8;       // WRONG on 3460: holds a string
+inline constexpr uintptr_t kStaticPlayerPos = 0x71C0C20;  // WRONG on 3460: holds pointers
+inline constexpr uintptr_t kChunkOrigin = 0x719DCA0;      // UNUSED: position is world-space
+inline constexpr uintptr_t kMinimapIconRoot = 0x71B1DD8;     // WRONG on 3460: holds 0xFFFF
+inline constexpr uintptr_t kMinimapIconRootAlt = 0x71B1DE0;  // WRONG on 3460: null
+inline constexpr uintptr_t kClientClockBias = 0x71B1CE8;     // WRONG on 3460: no bias there
+inline constexpr uintptr_t kClientClockGlobal = 0x70CDCAD;   // WRONG on 3460: no clock there
+inline constexpr uintptr_t kClientFrameClockMs = 0x70CDCE1;  // WRONG: junk; real field starts 0x70CDCE8
+inline constexpr uintptr_t kClientFrameClockUs = 0x70CDCE9;  // WRONG: one byte late; see above
+inline constexpr uintptr_t kClientClock = 0x1416B80;         // WRONG on 3460: no clock there
 
 // ---- inherited unchanged from 3446 ----------------------------------------
 // RTTI class count is identical between the two builds (15262 on each), and the

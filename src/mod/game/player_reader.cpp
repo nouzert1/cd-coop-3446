@@ -2,10 +2,13 @@
 
 #include <windows.h>
 
+#include <chrono>
 #include <cmath>
+#include <string>
 
 #include "common/math3d.h"
 #include "mod/game/offsets.h"
+#include "mod/game/rtti.h"
 #include "mod/game/safe_memory.h"
 #include "mod/log.h"
 
@@ -51,25 +54,6 @@ std::optional<uintptr_t> PlayerReader::resolve_actor() {
     return actor;
 }
 
-// TEMPORARY DIAGNOSTIC -- remove once kWorldSystemSlot is re-measured for this build.
-//
-// The 3446 value of kWorldSystemSlot does not work on 3460: reading it yields an
-// object whose vtable is GlobalVariableManager, not the WorldSystem, and the log
-// repeats "WorldSystem not created" with the character loaded and walking. Every
-// offline route tried to re-find it failed for a stated reason -- xrefs reports
-// shifted operands rather than instruction starts; the three sites for the old
-// address are shutdown thunks calling a destructor; and no module global points at
-// the structure that holds the live ClientActorManager.
-//
-// So the mod asks the game instead. A heap scan found exactly one live
-// ClientActorManager (its vtable is unique), so this sweeps the mod's own data range
-// for a POINTER-TO-POINTER whose target's [+kWorldSystem_ActorManager] is that
-// manager. That is a positive identification of the WorldSystem slot by what it
-// points at, not by an address someone remembered.
-//
-// Prints every candidate it finds so the answer can be read off a log rather than
-// guessed, and prints nothing when the sweep finds none -- which is itself the
-// useful result, because it means the WorldSystem is not in this range at all.
 
 std::optional<uintptr_t> PlayerReader::character_control() {
     if (!enabled_) return fail("unsupported game build");
