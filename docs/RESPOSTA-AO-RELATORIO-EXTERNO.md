@@ -128,15 +128,9 @@ sobre ele, o que é pré-condição, não solução.
 
 ---
 
-## 2. Progresso nesta sessão: um dos quatro endereços
+## 2. Progresso nesta sessão: dois dos quatro endereços
 
-Medi `kCcUpdate` no 3446:
-
-```
-kCcUpdate = exe+0x941D40
-```
-
-Três medições independentes, porque neste port já errei duas vezes por assumir valores:
+### 2.1 kCcUpdate = exe+0x941D40 — medido, três provas
 
 1. **Estática, offsets da struct.** O corpo da função toca quatro dos seis campos que
    `read_state()` lê: `[rcx+0x08]` (actor), `[rbx+0x40]` (state), `[rax+0x30]` (restore),
@@ -144,7 +138,8 @@ Três medições independentes, porque neste port já errei duas vezes por assum
 
 2. **Estática, vtable.** É o slot 16 da vtable de
    `.?AVClientCharacterControlActorComponent@pa@@` em `exe+0x59388D0` — a mesma vtable que o
-   port já usa como `kVtCharacterControl`.
+   port já usa como `kVtCharacterControl`. Confirmado lendo o slot como u64:
+   `slot 16 = 0x140941D40 = base + 0x941D40`.
 
 3. **Ao vivo, o objeto.** `findptr` localizou instâncias reais no jogo em execução, e o
    objeto tem **todos os seis** campos de `read_state` preenchidos:
@@ -166,33 +161,73 @@ jogador.
 3424:  48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57
 ```
 
-O compilador emitiu conjunto de registradores diferente. **Endereços e prólogos precisam ser
-remedidos a cada patch** — nenhum dos dois é portável.
+### 2.2 kRestore = exe+0x948240 — medido, duas provas
 
-### 2.1 kCcPost, kRestore, kPending: ainda não resolvidos
+1. **Offsets da struct.** O corpo lê o conjunto exato que `on_restore` percorre:
 
-Aqui sou direto: **não consegui.** Quatro abordagens falharam, e as registro para não serem
-repetidas:
+```
+exe+0x94828C   mov rax, [r13+0x08]     -> actor
+exe+0x9482AF   mov rax, [r13+0x40]     -> state
+exe+0x9482B3   cmp [rax+0x30], r14b    -> restore
+exe+0x94835D   mov rcx, [r13+0x88]     -> layer[0]
+exe+0x9483D2   mov rcx, [r13+0x90]     -> layer[1]
+```
 
-1. **Assinaturas de bytes.** O prólogo do `kCcUpdate` casa **500+** lugares num binário de
-   332 MB; `kCcPost`, `kRestore` e `kPending` casam 18–30+ cada. Varredura devolve palheiro.
-2. **Delta fixo a partir do `kCcUpdate`** (+0x1190 / +0x4B30, os vãos do 3424). Errado por
-   dois motivos independentes: este port já mediu que o delta entre builds **não é
-   constante**, e o `kCcUpdate` do 3446 tem só **311 bytes**, então um vão de 4496 bytes não
-   caberia dentro dele de qualquer forma.
-3. **Pontuar métodos da vtable por quantos offsets da struct tocam.** O critério é válido —
-   ele *acha* o `kCcUpdate` corretamente — mas os candidatos seguintes (slots 45, 56, 59)
-   eram falsos positivos ao inspecionar.
-4. **`xrefs` no `kCcUpdate`.** Sem referência RIP-relativa, como esperado para método
-   virtual alcançado por vtable.
+   Note que `this` está em **`r13`**, não em `rbx` como no `kCcUpdate`. O registrador que
+   carrega `this` não é estável entre funções e não pode ser assumido — os offsets é que
+   identificam.
 
-### 2.2 Uma pista estrutural que vale registrar
+2. **Prólogo idêntico ao 3424** (`48 8B C4 48 89 58 20 48 89 50 10 55 56 57 41 54`). Isto é
+   **corroboração, não a base**: o prólogo do `kCcUpdate` **não** sobreviveu ao patch, então
+   prólogo igual é sorte, e tratá-lo como evidência repetiria o erro que tornou as
+   assinaturas de bytes inúteis.
+
+### 2.3 O delta mudou — segunda prova de que delta fixo não serve
+
+```
+kCcUpdate -> kRestore:   3424 = 0x4B30    3446 = 0x6500
+```
+
+Medido, não inferido. Somado ao espalhamento de 0x35 já medido nos globais, o delta fixo
+está falsificado por **dois** motivos independentes.
+
+### 2.4 kCcPost e kPending: ainda não resolvidos
+
+Aqui sou direto: **não consegui.** Oito abordagens falharam, todas registradas em
+`docs/PORT-3446-containment.txt` para não serem repetidas. As três novas desta sessão:
+
+5. Varredura pelo prólogo do `kPending` — 30+ matches, nenhum na região `0x23xxxx` de onde
+   o endereço do 3424 veio. O prólogo dele também não sobreviveu.
+6. Varredura por `movzx [reg+0xA8]` (o byte *pending* que o `read_state` toca) — 8 hits; os
+   três na faixa `0x23xxxx` não pertencem a uma função que toque os outros offsets da
+   struct. Falso positivo.
+7. Percorrer a vtable do CC procurando entradas fora da faixa — ~50 candidatos, o que não é
+   um estreitamento. **`kPending` provavelmente não é método do `ClientCharacterControl`**:
+   no 3424 ele fica numa região diferente de todos os outros sites, então procurá-lo na
+   vtable é provavelmente procurar no lugar errado.
+
+### 2.5 Uma nota estrutural que importa para o kCcPost
 
 A função em `0x941D40` **não termina** no `ret` de `0x941DB5`. Três `jnz` saltam para
-`0x941DB6`, depois do `ret`, e essa região volta para `0x941DA4`. O compilador dividiu a
-função em dois blocos. Isso significa que procurar o `kCcPost` como "a função seguinte" é
-enganoso: ele pode ser um ponto **dentro** de uma função maior, que é o que um mid-hook
-espera. Não consegui fechar isso, mas é onde eu continuaria.
+`0x941DB6`, **depois** do `ret`, e essa região volta para `0x941DA4`. O compilador dividiu a
+função em dois blocos.
+
+Isso significa que o `kCcPost` pode **não ser** "a função seguinte" — pode ser um ponto
+**dentro** de um corpo maior, que é exatamente o que um mid-hook espera, e explicaria por
+que procurar o próximo prólogo falha sempre. **É o fio que eu puxaria a seguir.**
+
+### 2.6 O fio que ainda não puxei
+
+O relatório do 3424 (`docs/INFORME-CABALLO-CRASH.md`) amarra a cadeia:
+
+```
+update actor 0x8B56D0 → CC update 0x85FBA0 → 0x863E80 → 0x2329700 (layer) → 0x1F63F70
+```
+
+Portar essa cadeia significa achar `0x8B56D0` e `0x863E80` no 3446, **não** perseguir os
+dois endereços diretamente. O *layer walker* é o mais promissor: tem um comportamento que
+nada mais compartilha — checa `layer+0x110 != 0`, `dt > 0` e `rate > 0`, e **não** checa
+`+0x18`.
 
 ---
 
@@ -223,7 +258,8 @@ explicitamente: **não são.** O crash continua não corrigido.
 | `horse_diag_install()` não mente sobre `g_contain` | **corrigido** (defeito real) |
 | Afirmação de que build diferente bloqueia o spawn | **removida de 3 lugares** |
 | `kCcUpdate` no 3446 | **medido**: `exe+0x941D40`, 3 medições concordando |
-| `kCcPost`, `kRestore`, `kPending` | **não resolvidos** |
+| `kRestore` no 3446 | **medido**: `exe+0x948240`, 2 medições concordando |
+| `kCcPost`, `kPending` | **não resolvidos** (8 abordagens falhadas, registradas) |
 | Causa do fechamento do host | **não comprovada** |
 | Dump de crash do host | **não existe** |
 
