@@ -70,81 +70,6 @@ std::optional<uintptr_t> PlayerReader::resolve_actor() {
 // Prints every candidate it finds so the answer can be read off a log rather than
 // guessed, and prints nothing when the sweep finds none -- which is itself the
 // useful result, because it means the WorldSystem is not in this range at all.
-namespace diag {
-
-// Walks the FULL chain the reader uses -- world -> manager -> actor -> component ->
-// physics -> position -- and returns the position when it arrives at a value the
-// game's own orthonormal-basis check accepts.
-//
-// This exists because "has a ClientActorManager at +0x30" was NOT enough to tell the
-// two candidate world slots apart: measured live, 0x71B5CA0 and 0x71B5CF0 both hold
-// a pointer whose [+0x30] is the same single live manager. Requiring the chain to
-// reach a plausible position is a strictly stronger test, and it is the same test the
-// reader itself applies, so a slot that passes here is a slot the mod can actually use.
-bool chain_reaches_position(uintptr_t base, uintptr_t world, float* out_xyz) {
-    auto mgr = read_ptr(world + off::kWorldSystem_ActorManager);
-    if (!mgr || !has_vtable(*mgr, base + off::kVtClientActorManager)) return false;
-    auto actor = read_ptr(*mgr + off::kActorManager_ControlledActor);
-    if (!actor || !has_vtable(*actor, base + off::kVtControlledActor)) return false;
-    auto comps = read_ptr(*actor + off::kActor_ComponentTable);
-    if (!comps) return false;
-    auto ctl = read_ptr(*comps + off::kComponents_CharacterControl);
-    if (!ctl || !has_vtable(*ctl, base + off::kVtCharacterControl)) return false;
-    auto inner = read_ptr(*ctl + off::kControl_Inner);
-    if (!inner) return false;
-    auto phys = read_ptr(*inner + off::kControlInner_Physics);
-    if (!phys) return false;
-
-    float p[3];
-    if (!safe_read(*phys + off::kPhysics_Position, p, sizeof p)) return false;
-    // Reject values that cannot be a world position. The game's own loading park
-    // (0, 1000, 0) is deliberately NOT rejected here -- it is a real state, and
-    // during a load it is the honest answer.
-    for (float v : p) {
-        if (!std::isfinite(v) || std::fabs(v) > 1.0e7f) return false;
-    }
-    out_xyz[0] = p[0];
-    out_xyz[1] = p[1];
-    out_xyz[2] = p[2];
-    return true;
-}
-
-// Sweeps the mod's data range for a slot that carries the whole chain through to a
-// position. Logs every slot whose target has a live ClientActorManager at +0x30, and
-// says explicitly which of them also reached a position, so the answer is read off a
-// log rather than inferred from a candidate list.
-//
-// Returns how many slots reached a position. The caller repeats until this is
-// non-zero: an earlier single-shot sweep ran at 2.7 GB while the game was still
-// starting, found nothing, and that "nothing" would have been read as "the WorldSystem
-// is not in this range" when the truth was "it did not exist yet".
-int probe_world_slot(uintptr_t base) {
-    constexpr uintptr_t kScanBegin = 0x6000000;
-    constexpr uintptr_t kScanEnd = 0x10000000;
-    constexpr int kMaxHits = 12;
-
-    int good = 0;
-    for (uintptr_t rva = kScanBegin; rva + 8 <= kScanEnd; rva += 8) {
-        auto slot = read_ptr(base + rva);
-        if (!slot || *slot < 0x10000 || *slot > 0x7FFFFFFFFFFFULL) continue;
-        auto mgr = read_ptr(*slot + off::kWorldSystem_ActorManager);
-        if (!mgr || !has_vtable(*mgr, base + off::kVtClientActorManager)) continue;
-
-        float xyz[3] = {0, 0, 0};
-        if (chain_reaches_position(base, *slot, xyz)) {
-            log::warn("WorldSlot probe: WORKS rva 0x{:X} -> world 0x{:X} -> pos ({:.2f}, {:.2f}, {:.2f})",
-                      rva, *slot, xyz[0], xyz[1], xyz[2]);
-            if (++good >= kMaxHits) break;
-        } else {
-            log::warn("WorldSlot probe: manager-only rva 0x{:X} -> world 0x{:X} (chain does not reach a position)",
-                      rva, *slot);
-        }
-    }
-    log::warn("WorldSlot probe: {} slot(s) carried the full chain to a position", good);
-    return good;
-}
-
-}  // namespace diag
 
 std::optional<uintptr_t> PlayerReader::character_control() {
     if (!enabled_) return fail("unsupported game build");
@@ -208,9 +133,18 @@ std::optional<PlayerSnapshot> PlayerReader::read() {
     // This is the self-check that caught the wrong globals on this build: it reported
     // 46245.31 m, which is what sent the port back to re-measure. It compares two
     // independent derivations, so it does not depend on any external tool agreeing with
-    // itself -- which is exactly why it is worth keeping even while it is noisy.
+    // itself -- which is why it is worth keeping.
+    //
+    // kStaticPlayerPos is still the 3446 value and is still WRONG on this build. Its
+    // bytes are pointers, so a read that succeeds yields a meaningless distance and one
+    // that fails yields nothing; either way the number is not a measurement. It is
+    // computed only when BOTH sides are finite and non-zero, because the log showed
+    // `check vs game global inf m` -- a division of two zeroes, which reads as a
+    // catastrophic error when it is merely an absent one. Reporting an unknown as a
+    // number, even a spectacular number, is worse than reporting it as unknown.
     if (auto global = read_vec3(base_ + off::kStaticPlayerPos)) {
-        snap.static_pos_error = math::length(math::sub(snap.position, *global));
+        const float d = math::length(math::sub(snap.position, *global));
+        if (std::isfinite(d) && math::length(*global) > 0.0f) snap.static_pos_error = d;
     }
 
     // While a save loads, the game parks the actor at (0, 1000, 0) for tens
