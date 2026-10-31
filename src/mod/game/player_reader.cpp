@@ -131,12 +131,32 @@ std::optional<PlayerSnapshot> PlayerReader::read() {
         if (std::isfinite(d) && math::length(*global) > 0.0f) snap.static_pos_error = d;
     }
 
-    // While a save loads, the game parks the actor at (0, 1000, 0) for tens
-    // of seconds before placing it. Don't broadcast that as a real position.
-    if (std::fabs(snap.position.x) < off::kLoadingParkRadius &&
-        std::fabs(snap.position.z) < off::kLoadingParkRadius &&
-        std::fabs(snap.position.y - off::kLoadingParkHeight) < off::kLoadingParkRadius) {
-        return fail("loading (actor parked at 0,1000,0)");
+    // While a save loads, the game parks the actor at the world origin for tens of
+    // seconds before placing it. Don't broadcast that as a real position: the far end
+    // creates the character wherever it is told, and the origin is not a place.
+    //
+    // The parked VALUE moved with the same change that moved the read itself. Up to
+    // 3446 the position came through the physics pointer and the parked value was
+    // (0, 1000, 0); on 3460 the inline field at kControlInner_Position reads (0, 0, 0).
+    // This guard kept testing the old height, so it stopped matching while still
+    // looking correct, and the mod broadcast (0,0,0) as a real position.
+    //
+    // Cost: measured, not hypothetical. In the 2-PC test of 2026-10-31 the guest's
+    // position arrived as (0,0,0) for 216 consecutive state updates while their world
+    // loaded, the host spawned that character, and the host's game died ~230 ms later.
+    // The guest saw it standing in the sky -- (0,0,0) is above ground level, which on
+    // this map sits in the hundreds of metres. Both crashes that day have this as the
+    // only common anomaly. See docs/research/crash-2026-10-31-spawn*.txt.
+    //
+    // Accept both parked forms rather than replacing one guess with another: which one
+    // the game uses is a property of the build, not of this code.
+    const bool near_xz = std::fabs(snap.position.x) < off::kLoadingParkRadius &&
+                         std::fabs(snap.position.z) < off::kLoadingParkRadius;
+    const bool parked_at_origin = near_xz && std::fabs(snap.position.y) < off::kLoadingParkRadius;
+    const bool parked_at_height =
+        near_xz && std::fabs(snap.position.y - off::kLoadingParkHeight) < off::kLoadingParkRadius;
+    if (parked_at_origin || parked_at_height) {
+        return fail("loading (actor parked at the origin)");
     }
 
     read_stats(*components, snap);

@@ -1088,6 +1088,22 @@ bool puppet_spawn(const proto::SpawnInfo& info) {
         log::warn("Puppet: the other player's character is outside the world; not loaded");
         return false;
     }
+    // The bounds check above rejects values too LARGE. The origin is not too large, but
+    // it is not a place either: spawning there put the character in the sky in the
+    // 2-PC test of 2026-10-31, and the host's game died ~230 ms later. The sending side
+    // now refuses to broadcast a parked position (see player_reader.cpp); this is the
+    // second line, because a malformed packet from any source must not be able to take
+    // down the game that receives it. The receiver can see the bytes; it cannot see
+    // whether the sender's world had finished loading.
+    if (std::fabs(info.pos.x) < off::kLoadingParkRadius &&
+        std::fabs(info.pos.y) < off::kLoadingParkRadius &&
+        std::fabs(info.pos.z) < off::kLoadingParkRadius) {
+        std::lock_guard lock(g_mutex);
+        g_spawned = false;
+        log::warn("Puppet: the other player's position is the world origin; not loaded "
+                  "(their world is probably still loading)");
+        return false;
+    }
     const float pos[3] = {info.pos.x + g_offset_x, info.pos.y, info.pos.z};
     const float rot[4] = {info.rot.x, info.rot.y, info.rot.z, info.rot.w};
     const bool rot_ok = std::fabs(rot[0] * rot[0] + rot[1] * rot[1] + rot[2] * rot[2] + rot[3] * rot[3] - 1.0f) < 0.05f;
