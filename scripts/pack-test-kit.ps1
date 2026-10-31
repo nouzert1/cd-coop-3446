@@ -635,13 +635,23 @@ $investigation_text | Set-Content -Path (Join-Path $kit 'INVESTIGATION.md') -Enc
 # machine, so it walks the MINIDUMP structures directly.
 $diag = Join-Path $kit 'diagnostico'
 New-Item -ItemType Directory -Force -Path $diag | Out-Null
-foreach ($s in 'capture-hang.ps1', 'dump-threads.ps1', 'check-fieldtime.ps1', 'instalar-host.ps1') {
+foreach ($s in 'capture-hang.ps1', 'dump-threads.ps1', 'check-fieldtime.ps1', 'instalar-host.ps1', 'testar-um-pc.ps1') {
     $src = Join-Path $root "scripts\$s"
     if (-not (Test-Path $src)) { throw "Missing $src" }
     Copy-Item $src $diag -Force
 }
 if (-not (Test-Path (Join-Path $diag 'capture-hang.ps1'))) { throw 'diagnostico/capture-hang.ps1 is missing' }
 if (-not (Test-Path (Join-Path $diag 'dump-threads.ps1'))) { throw 'diagnostico/dump-threads.ps1 is missing' }
+
+# cdmp_peer.exe goes in BESIDE the diagnostic scripts, because testar-um-pc.ps1 drives it
+# and looks for it there. It is the single-PC echo peer: it sends your own data back to you
+# with a delay, so this PC is host and guest at once and the copy, relay and boss code all
+# actually run. Without it in the kit, the only way to exercise any of that is a second PC
+# -- which is exactly the thing that has been blocking this project.
+$peerExe = Join-Path $bin 'cdmp_peer.exe'
+if (-not (Test-Path $peerExe)) { throw "Missing $peerExe" }
+Copy-Item $peerExe $diag -Force
+if (-not (Test-Path (Join-Path $diag 'cdmp_peer.exe'))) { throw 'diagnostico/cdmp_peer.exe is missing' }
 
 $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
     $h = (Get-FileHash (Join-Path $kit $f) -Algorithm SHA256).Hash
