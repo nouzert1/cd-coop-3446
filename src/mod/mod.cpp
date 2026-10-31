@@ -547,7 +547,14 @@ struct LateInit {
     uint32_t mirror_delay_ms;
     float mirror_offset_m;
     bool coop;
-    float coop_offset_m;
+    // NOTE: there was a `float coop_offset_m;` here, written by every call site and read by
+    // none -- the same shape as the relay bug fixed in round 31 (a value passed in and never
+    // consumed). It is gone rather than left in place, because this struct is initialised
+    // POSITIONALLY: a dead field in the middle is a live hazard, one that invites the next
+    // person to insert something at the wrong slot and shift every following value by a
+    // position. Nothing is lost -- the offset reaches the puppet through CoopLink instead,
+    // which is constructed with cfg.coop_offset_m directly (mod.cpp:314) and calls
+    // puppet_set_offset from coop.cpp:64 and :123.
     bool coop_horse;
     bool coop_equip;
     bool coop_damage;
@@ -569,6 +576,31 @@ struct LateInit {
     int copy_attack_slots;
     uint8_t pin_shape, pin_colour;
 };
+
+// LateInit is built with a POSITIONAL aggregate initialiser (the CreateThread call below), so
+// its field ORDER is load-bearing and its field COUNT must match that one initialiser. Adding,
+// removing or reordering a field without updating it shifts every following value by a
+// position -- and since these are mostly bools and floats, that compiles CLEAN and produces a
+// mod configured wrong in ways no compiler will mention.
+//
+// 80 is the MEASURED size. This started as `<= 128`, which was tested and found worthless:
+// 128 bytes of extra fields were added on purpose and the build still passed. A guard that does
+// not fire on the case it exists for guards nothing.
+//
+// To read sizeof out of MSVC, do not try to interpolate it into static_assert's message -- the
+// message is fixed text and the value does not appear, at any bound. What works is a template
+// whose instantiation error NAMES the type with the size in it:
+//
+//     template <class T, std::size_t = sizeof(T)> struct probe_size {
+//         static_assert(sizeof(T) == 0, "...");
+//     };
+//     probe_size<LateInit> p;   // error reads: probe_size<...LateInit,80>
+//
+// That is where the 80 above came from. It cost several builds to find, so it is written down.
+static_assert(sizeof(LateInit) == 80,
+              "LateInit changed size: check that the aggregate initialiser at its CreateThread "
+              "call site still lists every field in the same order and count, then set this "
+              "bound to the new size (see the note above for how to read it).");
 
 // Dev: Ctrl+F9 / Ctrl+Shift+F9 walk the game's icon table for the other
 // player's minimap icon. The game only draws a changed icon if it creates it
@@ -1002,7 +1034,7 @@ DWORD WINAPI worker(LPVOID) {
                                          new LateInit{in_game, overlay, sniffer,
                                                       in_game && cfg.dev_clone_hotkeys,
                                                       cfg.dev_mirror_delay_ms, cfg.dev_mirror_offset_m,
-                                                      in_game && cfg.coop_enabled, cfg.coop_offset_m,
+                                                      in_game && cfg.coop_enabled,
                                                       cfg.coop_horse, cfg.coop_equip, cfg.coop_damage,
                                                       in_game && cfg.dev_combat_tests, cfg.sniffer_record,
                                                       dir, cfg.coop_minimap_icon, cfg.dev_minimap_cycle,
