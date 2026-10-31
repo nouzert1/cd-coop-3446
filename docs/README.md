@@ -7,10 +7,16 @@ Comece por:
 
 | Documento | Para quê |
 |---|---|
-| [GUIA-JOGADOR.md](GUIA-JOGADOR.md) | **Jogar.** Instalar, testar, o que não funciona |
+| [GUIA-ANFITRIAO.md](GUIA-ANFITRIAO.md) | **Ser o dono da partida.** Preparo, sessão, risco, checklist |
+| [GUIA-CONVIDADO.md](GUIA-CONVIDADO.md) | **Visitar o mundo de um amigo.** Instalar, entrar, o que esperar |
 | [PORTING.md](PORTING.md) | **Portar para um build novo.** O método que funcionou |
 | [BUGS-ABERTOS.md](BUGS-ABERTOS.md) | **Todo problema aberto**, ordenado por valor por hora |
 | [HISTORIA-PORTES.md](HISTORIA-PORTES.md) | O que quebrou em cada atualização |
+
+> Os dois guias de jogo são **separados de propósito**. Os papéis instalam configurações diferentes
+> (`role=host` vs `role=guest`), fazem coisas em ordem diferente e têm risco diferente: o jogo do
+> anfitrião é o que recebe escrita e o que pode travar; o convidado só recebe dados.
+> [GUIA-JOGADOR.md](GUIA-JOGADOR.md) é a versão combinada e mais curta.
 
 ---
 
@@ -20,12 +26,14 @@ Estes descrevem o estado **de agora** e são atualizados junto com o código.
 
 | Arquivo | Conteúdo |
 |---|---|
-| [GUIA-JOGADOR.md](GUIA-JOGADOR.md) | Guia do jogador, em português |
+| [GUIA-ANFITRIAO.md](GUIA-ANFITRIAO.md) | Guia do anfitrião |
+| [GUIA-CONVIDADO.md](GUIA-CONVIDADO.md) | Guia do convidado |
+| [GUIA-JOGADOR.md](GUIA-JOGADOR.md) | Guia combinado (versão curta) |
 | [PORTING.md](PORTING.md) | Como portar; as armadilhas da ferramenta |
 | [BUGS-ABERTOS.md](BUGS-ABERTOS.md) | Problemas abertos + sugestões para contribuidores |
 | [HISTORIA-PORTES.md](HISTORIA-PORTES.md) | Histórico dos ports, com os deltas medidos |
 | [ROADMAP.md](ROADMAP.md) | Como cada recurso foi construído, milestone por milestone |
-| [TESTE-2-PCS-2026-10-31.md](TESTE-2-PCS-2026-10-31.md) | Roteiro do teste de dois PCs |
+| [TESTE-2-PCS-2026-10-31.md](TESTE-2-PCS-2026-10-31.md) | Roteiro técnico do teste de dois PCs |
 | [research/globais-3460.md](research/globais-3460.md) | Os 4 globais medidos no 3460, com o que quebra |
 | [research/porte-3460.md](research/porte-3460.md) | O port 3446 → 3460, com as linhas de log cruas |
 | [research/validacao-3460.md](research/validacao-3460.md) | As medições ao vivo: o que passou, o que falhou |
