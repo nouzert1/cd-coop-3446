@@ -192,13 +192,8 @@ using build_3424::kPhysics_Position;
 using build_3424::kPinColourCount;
 using build_3424::kPinGroupNormal;
 using build_3424::kPinShapeCount;
-using build_3424::kPointClimbEnter;
-using build_3424::kPointClimbEnterHead;
 using build_3424::kRelayedAcks;
 using build_3424::kRemoteCatchSceneId;
-using build_3424::kRideEnterHead;
-using build_3424::kRideOffEnter;
-using build_3424::kRideOnEnter;
 using build_3424::kServerActor_Key;using build_3424::kServerDockingWriter;
 using build_3424::kServerDockingWriterHead;
 using build_3424::kStatContainer_Count;
@@ -399,6 +394,57 @@ inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
 // Fixing the value is the first time this path can work at all, so it should be treated
 // as untested rather than as a repaired feature.
 inline constexpr uintptr_t kVtWallUpMovementMethod = 0x5918F78;  // 3424:0x5916EC8 (was 0x55968B8, not this vtable)
+
+// ---- The three movement-method Enter hooks, found by RTTI on 2026-10-31 -----
+//
+// All three were still carrying 3424 values, so puppet_install_climb_fix() refused to hook
+// and every boot printed `WRN Puppet: PointClimb::Enter not recognised; wall climbs will
+// freeze`. The horse's RideOn/RideOff were refused the same way, silently, one line further
+// down the same function.
+//
+// HOW THEY WERE FOUND, because the obvious ways all fail:
+//
+//   * The 16-byte prologue (kPointClimbEnterHead, offsets_3424.h:314) is GENERIC. Scanning
+//     3446 for it returns 20 hits -- it is just `mov r11,rsp` plus the standard x64 frame
+//     setup that half the game's functions open with. Anchoring on it identifies nothing.
+//   * The old value, exe+0x691400, does not even hold that prologue in 3446: it reads
+//     `mov r14d,ecx / mov [r11-0x38],r15 / ...`, an unrelated function. The value was wrong,
+//     not merely stale, and the head comparison below it could never have matched.
+//   * Disassembling the prologue hits and looking for the (this, void*, uint8_t) signature
+//     narrows it but does not settle it; three of the four candidates look plausible.
+//
+// What does settle it is the RTTI chain, because these are virtual methods and the compiler
+// recorded their class:
+//
+//   probe --image CrimsonDesert.exe classes PointClimbMovementMethod
+//     -> .?AVPointClimbMovementMethod@pa@@ @ exe+0x6EE1178
+//   probe --image CrimsonDesert.exe vtables ".?AVPointClimbMovementMethod@pa@@"
+//     -> vtable exe+0x59175F8
+//   probe --image CrimsonDesert.exe dump 0x14059175F8 --size 96
+//     -> slot +0x38 = exe+0x75F630
+//
+// and exe+0x75F630 opens with exactly the bytes kPointClimbEnterHead expects
+// (4C 8B DC 49 89 5B 10 49 89 6B 18 49 89 73 20 57 -- verified byte for byte) and then does
+//
+//   movzx ebp, dl          <- captures the third parameter, uint8_t same_method
+//   mov rdi, rcx           <- this
+//   mov byte ptr [rcx+0x268], 0
+//   cmp [rdi+0x34], sil / jz / mov eax,1
+//
+// which is Enter(this, method, same_method) -> uint8_t, the exact signature the hook in
+// remote_puppet.cpp:940 is declared with. The prologue alone was never proof; the prologue
+// plus the class plus the parameter use is.
+//
+// RideOn and RideOff came out of the same walk -- the Enter sits at slot +0x38 in all three
+// movement-method classes -- and both open with the bytes kRideEnterHead expects
+// (48 8B C4 48 89 58 10 48 ...).
+inline constexpr uintptr_t kPointClimbEnter = 0x75F630;  // 3424:0x691400 (wrong even there)
+inline constexpr uint8_t kPointClimbEnterHead[] = {0x4C, 0x8B, 0xDC, 0x49, 0x89, 0x5B, 0x10, 0x49,
+                                                   0x89, 0x6B, 0x18, 0x49, 0x89, 0x73, 0x20, 0x57};
+inline constexpr uintptr_t kRideOnEnter = 0x74E8E0;   // vtable pa::RideOnMovementMethod  exe+0x5917760
+inline constexpr uintptr_t kRideOffEnter = 0x74F8B0;  // vtable pa::RideOffMovementMethod exe+0x59177B8
+inline constexpr uint8_t kRideEnterHead[] = {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x10, 0x48,
+                                             0x89, 0x70, 0x18, 0x55, 0x57, 0x41, 0x54, 0x41};
 
 // ---- Troc handler instances ----------------------------------------------
 // MEASURED by running the mod's own walk against the live game, then bracketed
