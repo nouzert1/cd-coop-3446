@@ -1,6 +1,8 @@
 #ifndef CDMP_MOD_GAME_EXIT_WATCH_H
 #define CDMP_MOD_GAME_EXIT_WATCH_H
 
+#include <cstdint>
+
 // Records a SILENT death of the game.
 //
 // The two crashes during the 2-PC test of 31 Oct 2026 (16:33 and 17:11) left nothing
@@ -16,18 +18,31 @@
 //
 // The 31 Oct crashes were not (1). That leaves (2) and (3), both of which go through
 // TerminateProcess, and both of which are invisible unless something is watching the
-// call. This watches it: it hooks TerminateProcess and ExitProcess, writes the exit
-// code, the calling module and a short stack to cdmp.log, and then lets the exit proceed.
+// call. This watches it.
 //
-// A note on what this can and cannot do: it cannot PREVENT the exit, and it must not try.
-// If the game decided to die, holding it open would be a worse bug than the one being
-// diagnosed. It exists only to leave a record.
+// ---------------------------------------------------------------------------------
+// READ THIS BEFORE CHANGING ANYTHING: the first version of this header's implementation
+// hooked RaiseException as well, and that broke BOTH players' games -- the mod died
+// before the main menu on two different machines, and the only difference from the build
+// that had worked was this feature. RaiseException is normal C++ control flow, not an
+// error path. The implementation records into a pre-allocated buffer with no allocation,
+// no locks and no formatting, because the hook runs while the process is going down.
+// ---------------------------------------------------------------------------------
 
 namespace cdmp::game {
 
 // Hooks the process-exit paths. Returns false if the prologues are not recognisable on
 // this build, in which case nothing is installed and the game behaves as before.
+//
+// RaiseException is deliberately not hooked. The first version did, and both players'
+// games began dying before the main menu; the C++ runtime uses RaiseException as normal
+// control flow, so the hook ran logging and a stack walk inside exception dispatch. See
+// the comment block in the .cpp before changing anything here.
 bool exit_watch_install();
+
+// Reads the record an exiting process leaves behind. Returns false when no exit was seen.
+// There is no callback by design: the callback was the unsafe part.
+bool exit_watch_take_record(uint32_t& code, const char*& via, void* const*& frames, int& count);
 
 }  // namespace cdmp::game
 

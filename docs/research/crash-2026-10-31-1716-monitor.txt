@@ -1,0 +1,7 @@
+﻿Monitor da 3a tentativa (31/10/2026)
+Ultima linha do cdmp.log:  17:11:34.420
+Monitor detectou o fim:    17:11:37
+=> o processo morreu ~2.6 s depois da ultima linha escrita
+
+O jogo NAO voltou sozinho. Ficou fechado das 17:11:37 as 17:30 (o usuario fechou o resto).
+Nenhum PID novo apareceu -- ou seja, nao foi um restart, foi a morte mesmo.
