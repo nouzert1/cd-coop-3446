@@ -972,6 +972,26 @@ void test_enemy_zone_predicate() {
     // The table values these cases rely on.
     CHECK(is_table_hostile_faction(1000016) && is_table_hostile_faction(1000128) && !is_table_hostile_faction(1000001));
     CHECK(!is_excluded_variant(50031) && is_excluded_variant(54001));
+    // Bosses, middle bosses and uniques are excluded by variant, and this exclusion is
+    // load-bearing in TWO places that mean different things:
+    //
+    //   zone_check  -- a boss is never hidden in the guest's world. Each player sees
+    //                  their own, so the guest must keep seeing the real one.
+    //   loot_twin   -- loot_twin.cpp:224 refuses to build a twin for these, and that
+    //                  refusal is a deliberate SAFETY rule, not an oversight. The twin
+    //                  is an actor the GUEST's own server spawns to hand out loot; a
+    //                  boss twin would be a boss appearing in a world that never had
+    //                  its stage, dropping loot from a quest state that does not exist
+    //                  there. botin-invitado.md section 6 requires the variant be a
+    //                  normal world variant "sin jefes, elites, unicos".
+    //
+    // If a test ever fails here because someone relaxed this to make boss loot work,
+    // the fix is not this table -- it is the twin-boss approach (pendiente-jefes.md
+    // section 3, approach D), where each world runs its own stage. See
+    // docs/JEFES-POR-QUE-NAO-FECHA.md.
+    CHECK(is_excluded_variant(30194));   // Animal_Boss_Cucubird_Wild
+    CHECK(is_excluded_variant(55504));   // Boss_ReedDevil_DualSword
+    CHECK(is_excluded_variant(60003));   // Boss_Dragon_*
     CHECK(origin_class(0x343A74A6) == 1 && origin_class(0xBF04A5ED) == 2 && origin_class(0x12345678) == 0);
     const ZoneRules plain{};
     LoadSpec bandit;
