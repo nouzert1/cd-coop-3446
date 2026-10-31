@@ -1,0 +1,106 @@
+CONTAINMENT HOOKS ON 1.0.0.3446 - measurement log
+================================================
+
+Goal: the four `Site` entries in src/mod/net/horse_diag.cpp that must ALL match for the
+crash containment to install. On 3446 one of them fails, the containment is skipped, and
+the host's game dies 0.4 s after the other player's character is injected.
+
+Sites as they stand (image-relative, from the 3424 port):
+  kCcUpdate  0x85FBA0   "CC update"
+  kCcPost    0x860D30   "CC post-update"
+  kRestore   0x8646D0   "restore actions"
+  kPending   0x2329D70  "pending actions"
+
+
+RESULT SO FAR
+-------------
+
+kCcUpdate = exe+0x941D40   MEASURED, three independent agreeing measurements.
+
+Method: the four Site byte signatures are useless as a search key. The 16-byte prologue
+of kCcUpdate matches 500+ places in a 332 MB binary, and kCcPost / kRestore / kPending
+match 18-30+ each. A scan returns a haystack, not an answer.
+
+What works is behaviour. The component struct the mod reads has a distinctive field layout
+(read_state in horse_diag.cpp):
+
+  cc+0x08  -> actor (read_key pulls the actor key from here)
+  cc+0x40  -> state object; +0x30 of it is `restore`
+  cc+0x80  -> pending_list
+  cc+0x88  -> layer[0]
+  cc+0x90  -> layer[1]
+  cc+0xA8  -> pending
+
+PROOF 1 - static, struct offsets. A function that touches most of those IS the update.
+exe+0x941D40 contains four of them:
+
+  exe+0x941D52   mov rax, [rcx+0x08]      -> actor
+  exe+0x941D84   mov rax, [rbx+0x40]      -> state
+  exe+0x941D88   cmp [rax+0x30], sil      -> restore
+  exe+0x941D8E   cmp [rbx+0xA8], sil      -> pending
+  exe+0x941DE9   mov rax, [rbx+0x88]      -> layer[0]
+
+PROOF 2 - static, vtable slot. exe+0x941D40 is slot 16 of the vtable of
+.?AVClientCharacterControlActorComponent@pa@@ at exe+0x59388D0 - the same vtable the port
+already uses as kVtCharacterControl. Slot identity is not proof on its own, but it agrees
+with Proof 1.
+
+PROOF 3 - live, the object itself. This is the one that settles it. findptr located live
+instances of the vtable in the running game, and the object at one of them reads:
+
+  +0x00  exe+0x59388D0      vtable -> .?AVClientCharacterControlActorComponent@pa@@
+  +0x08  0x2A0FC82A380      -> .?AVClientNormalInGameActor@pa@@   (actor)
+  +0x40  0x2A131F1ACD0      (state)
+  +0x80  0x2A1F6B7B800      (pending_list)
+  +0x88  0x2A1F772B400      (layer[0])
+  +0x90  0x2A1F772A8C0      (layer[1])
+  +0xA8  0                  (pending)
+
+All six fields read_state touches exist and are populated, on a real object, in a live
+process. And actor+0x60 - kActor_Key - reads 0xB01017E1: the 0xB0 prefix is the PLAYER
+actor key family (in the crash session the other player appears as player 0xA0100001).
+So the object found is a player's character control, which is exactly what the hook guards.
+
+Prologue for the new Site (16 bytes as the struct wants them):
+
+  48 89 5C 24 10 48 89 74 24 18 57 48 83 EC 20 48
+
+Note it is NOT the 3424 prologue (48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57): the
+compiler emitted a different register set this build. Offsets are not portable across
+patches and neither are prologues; both must be re-measured every time.
+
+
+NOT FOUND
+---------
+
+kCcPost, kRestore and kPending are still unresolved.
+
+What was tried and failed, recorded so it is not repeated:
+
+  1. Byte signatures - 18-30+ matches each. No discrimination.
+  2. Fixed delta from kCcUpdate (+0x1190 / +0x4B30, the 3424 gaps). WRONG: the port
+     already established that the delta between builds is not constant (it spreads 0x35
+     across the globals), so reusing a gap is not sound.
+  3. Scoring every vtable method by how many struct offsets it touches. This DOES
+     surface kCcUpdate correctly, so the metric is valid, but the runner-up candidates
+     (slots 45, 56, 59) each turned out to touch only one or two offsets on inspection -
+     they were false positives, and slot 56 in particular is a short function that ends
+     at exe+0x94A26C.
+  4. xrefs on exe+0x941D40: no RIP-relative reference, as expected for a virtual method
+     reached through the vtable.
+
+Next step that is actually promising: kCcPost is the post-update pass over the same
+component, so look for the function that the kCcUpdate CALL SITE reaches - i.e. disassemble
+past exe+0x941D40's tail and find the sibling methods invoked in the same frame, rather
+than scanning the whole image. Failing that, resolve it live: hook nothing, read the
+vtable slot ordering at runtime in a game that is already running, and correlate.
+
+
+WHAT THIS DOES AND DOES NOT BUY
+-------------------------------
+
+Resolving kCcUpdate alone is not enough to enable containment: horse_diag_install hooks
+all four in one `&&` chain and installs none if any fails. So the crash is not fixed yet.
+
+It does mean the hardest of the four is now identified, and the method that found it is
+written down and reproducible.
