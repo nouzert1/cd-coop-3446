@@ -24,6 +24,9 @@
 #include "mod/net/room_codec.h"
 #include "mod/net/boss_rules.h"
 
+// Defined in exit_watch_self_test.cpp. Windows-only; returns the number of failures.
+int exit_watch_self_test();
+
 #include <cctype>
 
 using namespace cdmp;
@@ -1532,6 +1535,9 @@ int main() {    test_pattern();
     test_enemy_zone_machine();
     test_room_code();
     test_boss_rules();
+    // Windows-only: proves the exit hook used to diagnose the silent deaths of
+    // 31 Oct 2026 actually fires, rather than only reporting that it installed.
+    g_failures += exit_watch_self_test();
     if (g_failures == 0) std::printf("All tests passed\n");
     return g_failures == 0 ? 0 : 1;
 }

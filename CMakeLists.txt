@@ -111,6 +111,7 @@ add_library(cdmp_mod SHARED
     src/mod/game/actor_lookup.cpp
     src/mod/game/game_errors.cpp
     src/mod/game/game_clock.cpp
+    src/mod/game/exit_watch.cpp
     src/mod/net/steam_transport.cpp
     src/mod/net/room_code.cpp
     src/mod/net/boss_safe.cpp
@@ -158,7 +159,7 @@ endif()
 
 # Tests.
 enable_testing()
-add_executable(cdmp_tests tests/tests.cpp)
+add_executable(cdmp_tests tests/tests.cpp tests/exit_watch_self_test.cpp)
 cdmp_strict(cdmp_tests)
 # src is on the include path through cdmp_common; the room-code codec is a
 # header-only, Windows-free piece of src/mod/net and is tested through it.

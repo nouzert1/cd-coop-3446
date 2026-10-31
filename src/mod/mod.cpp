@@ -13,6 +13,7 @@
 #include "common/udp.h"
 #include "mod/config.h"
 #include "mod/game/game_errors.h"
+#include "mod/game/exit_watch.h"
 #include "mod/game/offsets.h"
 #include "mod/game/player_reader.h"
 #include "mod/game/safe_memory.h"
@@ -802,6 +803,11 @@ DWORD WINAPI late_init(LPVOID param) {
     bool sniffer_ok = false;
     if (init->sniffer && init->in_game) sniffer_ok = net::sniffer_install(init->dir, g_stop, init->record);
     if (sniffer_ok) game::game_errors_install();  // drained by the sniffer's writer thread
+    // Before anything else that can fail: the two silent deaths of 31 Oct 2026 left no
+    // WER entry, no dump, and no exception for our own __try/__except. Whatever ends the
+    // process does it without an exception, so watch the exit itself. Installed even when
+    // the sniffer or co-op are off, because the question is about the process, not the mod.
+    game::exit_watch_install();
     if (init->overlay) render::install(render::hud_draw);
     if (init->combat_tests && sniffer_ok) {
         CloseHandle(CreateThread(
