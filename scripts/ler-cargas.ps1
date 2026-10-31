@@ -52,6 +52,10 @@ while ($off + 24 -le $bytes.Length) {
     $size   = [BitConverter]::ToUInt16($bytes, $off + 10)
     $copied = [BitConverter]::ToUInt16($bytes, $off + 12)
     $off += 24
+    # A guarda tem que ser `+ copied` E `>= 12`, porque o payload lido abaixo chega a +7.
+    # Sem o `>= 12`, um pacote curto (o menor desta captura tem copied=5) faz a leitura em
+    # $p+7 passar do fim do array e derruba o script inteiro com ArgumentException -- o que
+    # apareceria como "o analisador nao roda" em vez de "uma carga curta foi pulada".
     if ($off + $copied -gt $bytes.Length) { break }
     if ($copied -lt $size) { $notSold++ }
 
@@ -63,18 +67,56 @@ while ($off + 24 -le $bytes.Length) {
     # um resultado que parecia uma descoberta (o jogo nao manda cargas no 3446!) e era so' um
     # filtro invertido. A licao vale para o resto: um zero so' significa alguma coisa depois
     # que a ferramenta que o produziu foi conferida contra uma fonte que nao seja ela mesma.
-    if ($copied -ge 5 -and $dir -eq 2) {
-        $op = [BitConverter]::ToUInt16($bytes, $off)
+    if ($copied -ge 12 -and $dir -eq 2 -and $off + 7 -le $bytes.Length) {
+        # O PAYLOAD COMECA EM $off, NAO EM $off+24 -- a linha 54 ja' avancou $off pelos 24
+        # bytes do descritor antes de chegar aqui. A primeira versao desta correcao escreveu
+        # `$p = $off + 24` e com isso leu o DESCRITOR DO PROXIMO pacote: o opcode nunca era
+        # 2005, a contagem deu 0, e a mensagem impressa foi "o sniffer nao ve cargas" --
+        # uma conclusao sobre o JOGO produzida inteiramente por um erro de aritmetica no
+        # analisador. E' o mesmo modo de falha das duas correcoes anteriores nesta funcao, e
+        # e' por isso que a validacao (len+5==copied em 13890/13890) foi feita ANTES de
+        # acreditar no numero, e nao depois.
+        # ---------------------------------------------------------------------------------
+        # O OPCODE ESTA' NO PAYLOAD, NAO NO DESCRITOR. Este era o bug de verdade, e ele
+        # explicava o "tipo 255" -- as outras duas correcoes desta funcao tratavam sintomas.
+        #
+        # O descritor de 24 bytes NAO TEM OPCODE. Ele e':
+        #
+        #   +0  u64  t_us        B4 2A A0 BE 0A 00 00 00
+        #   +8  u8   dir         01 ou 02
+        #   +9  u8   pad         00
+        #   +10 u16  size        02 41
+        #   +12 u16  copied      02 41
+        #   +14 u16  pad
+        #   +16 u32  session
+        #   +20 u32  thread
+        #
+        # O pacote Troc comeca em $off+24, e so' ali existe opcode. Ler u16 em $off pegava
+        # os dois primeiros bytes de t_us -- que sobem a cada pacote -- e o filtro
+        # `-eq 2005` casava por acaso, em ~20 lugares, produzindo uma amostra pequena e
+        # incoerente que ainda parecia uma medicao. Foi por isso que a contagem deu 20
+        # enquanto o total real era 13890.
+        #
+        # O layout do PAYLOAD, agora conferido contra o proprio arquivo em 13890 de 13890
+        # cargas (len+5 == copied em 100% delas):
+        #
+        #   +0  u16  opcode       D5 07          = 2005
+        #   +2  u8   slot         FF
+        #   +3  u16  len          FD 40          -> len + 5 == copied
+        #   +5  u8   ...          00
+        #   +6  u8   ...          00
+        #   +7  u8   type         03 / 06 / 07   <- o type, como native_suppress.cpp le
+        #
+        # Conferencia nos tres primeiros pacotes grandes: (16637,16642) (23082,23087)
+        # (6843,6848) -- len+5 == copied nos tres. A validacao esta' no comentario da
+        # versao porque foi ela, e nao uma leitura de codigo, que fechou o caso.
+        $p  = $off
+        $op = [BitConverter]::ToUInt16($bytes, $p)
         if ($op -eq $KOpActorLoadDataAck) {
             $n++
             $payload = $copied - 5
             if ($payload -gt $biggest) { $biggest = $payload }
-            # Layout do payload de uma carga (native_suppress.cpp:961):
-            #   u16 len | u8 type | u32 key | u32 owner | ...
-            # Ou seja: len em +0, type em +2. Ler o type em +7 (como a primeira versao fazia)
-            # devolvia 0 em tudo e as cargas tipo 3/6 nunca eram contadas -- um segundo zero
-            # falso, na mesma funcao, escondido atras do primeiro.
-            $t = $bytes[$off + 2]
+            $t = $bytes[$p + 7]
             if (-not $types.ContainsKey($t)) { $types[$t] = 0 }
             $types[$t]++
             if ($t -eq 3 -or $t -eq 6) {

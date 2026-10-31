@@ -25,3 +25,6 @@ cdmp_learnt.txt
 hang-dumps/
 *.dmp
 
+
+# Capturas de pacotes: 533 MB cada, e sao dados de pesquisa local, nao fonte.
+build/research/captura-*/
