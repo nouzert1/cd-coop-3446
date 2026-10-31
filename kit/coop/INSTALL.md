@@ -9,6 +9,45 @@ verification steps.
 
 ---
 
+## Step −1 — prove this is the kit you think it is
+
+**Run this before anything else, including the backup.**
+
+Earlier kits are still installed on some machines, and their copies of this file and of
+`INVESTIGATION.md` are still sitting in the game folder. An agent that reads one of those
+old files gets an old required build — and the obvious reading of "required build 1.0.0.3446"
+on a 1.0.0.3460 game is to stop, or worse, to propose downgrading the game. That has already
+happened once. So identify the kit by its contents, not by which file you happened to open.
+
+```powershell
+$kit = $PSScriptRoot   # or wherever you extracted this kit; adjust if needed
+Get-FileHash "$kit\cdmp.asi" -Algorithm SHA256 | Select-Object -ExpandProperty Hash
+```
+
+| Result | Meaning |
+|---|---|
+| `{{ASI_SHA256}}` | **This is the current kit.** Continue to Step 0. |
+| `70C5436365410668ED5998BB446DA4A11304A903BCC2A5AE90128EA0DD308FBE` | A kit from before 31 Oct 2026. It has the spawn crash that the current one fixes. **Discard it and get the current kit.** |
+| anything else | Not a kit this document describes. Stop and ask. |
+
+### If the game folder already has old kit files in it
+
+Files from a previous kit may still be in `bin64` (`INSTALL.md`, `INVESTIGATION.md`,
+`LEIA-ME.txt`, `README.txt`, `COMECE-AQUI-PORTUGUES.txt`, `SHA256SUMS.txt`). They describe
+a different build and will mislead you. List them before starting:
+
+```powershell
+$game = "C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64"
+Get-ChildItem $game -Force |
+  Where-Object { $_.Extension -in '.md', '.txt' } |
+  Select-Object Name, Length, LastWriteTime | Sort-Object LastWriteTime
+```
+
+Anything dated before the kit you are installing is stale. The mod itself reads none of
+these files — deleting them is safe, and this kit's own copies replace them.
+
+---
+
 ## Facts you need
 
 | Item | Value |

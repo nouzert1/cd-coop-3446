@@ -1,9 +1,20 @@
 # INVESTIGATION.md — why the host crashes when the other player's character spawns
 
+**THIS IS NOT THE INSTALL FILE.** If you were asked to install the mod, stop reading this and
+use `INSTALL.md`, which describes the current build (**1.0.0.3460**). This file is a research
+note about a crash seen on an older build; following it as an install procedure will lead you
+to propose installing a build the game no longer is, or downgrading the game. Do not do either.
+
 **BUILD NOTICE.** This document describes a crash observed on game build **1.0.0.3446**, and
 every address in it belongs to that build. The kit has since moved to **1.0.0.3460** and the
 game has been re-ported. **Do not use any address below on 1.0.0.3460** — re-measure it first.
 What still transfers is the method, the failure modes, and the three traps in Section 4.
+
+> **Update (31 Oct 2026).** The crash this file describes has a cause, and it is fixed in the
+> current kit. The guest's position arrived as `(0,0,0)`, and the loading-park guard that
+> should have rejected it was still testing the value the *previous* build produced. See the
+> commit "The loading-park guard tested a value this build no longer produces". Sections 1–3
+> below are kept for the method; the specific offsets are historical.
 
 For an AI coding agent doing reverse-engineering work. This is a **research task**, not an
 install task. `INSTALL.md` covers installation.
