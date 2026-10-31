@@ -35,10 +35,16 @@ if (Get-Process CrimsonDesert -ErrorAction SilentlyContinue) {
 #
 # The build id is baked in at CMake configure time (CMakeLists.txt runs git
 # rev-parse through execute_process), so a .asi built before a later commit keeps
-# the OLDER id. The mod exchanges this id on connect and refuses to pair when the
-# two sides differ, so shipping a stale binary means both players get "Different
-# mod versions" while holding what looks like the same ZIP -- with nothing
-# pointing at the real cause.
+# the OLDER id. The mod exchanges this id on connect and the HUD warns when the two
+# sides differ, so shipping a stale binary means both players see "Different mod
+# versions" while holding what looks like the same ZIP -- with nothing pointing at
+# the real cause.
+#
+# (This comment used to say the mod "refuses to pair" on a mismatch. It does not:
+# check_build() in client_session.cpp records a warning and returns, and nothing on the
+# spawn path reads it. The stale-build check below is still worth having, because two
+# sides on different builds is an uncontrolled test, but overstating what the mismatch
+# does sends the next person looking in the wrong place.)
 $idHeader = Join-Path $root 'build\generated\build_id.h'
 $head = (& git -C $root rev-parse --short=8 HEAD 2>$null)
 if ($LASTEXITCODE -ne 0 -or -not $head) {
@@ -788,4 +794,4 @@ Write-Host "Zip : $zip  ($([math]::Round((Get-Item $zip).Length / 1MB, 2)) MB)"
 Write-Host "cdmp.asi SHA256: $asiHash"
 Write-Host ''
 Write-Host 'Send the ZIP to your friend. BOTH of you use this same ZIP: the mod'
-Write-Host 'compares a build id on connect and refuses to pair if they differ.'
+Write-Host 'compares a build id on connect and warns if they differ (it does not block).'
