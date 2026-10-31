@@ -17,6 +17,7 @@
 #include "common/keys.h"
 #include "mod/game/actor_lookup.h"
 #include "mod/log.h"
+#include "mod/net/boss_rules.h"
 #include "mod/net/boss_safe.h"
 #include "mod/net/local_capture.h"
 #include "mod/net/loot_twin.h"
@@ -684,10 +685,29 @@ bool send_enemy(uint32_t key, const char* why, uint32_t epoch = 0) {
         }
         action.swap(kept);
     }
-    Bytes msg(8);
+    // `flags` (v10): tell the other side this copy is a stage boss, so its own
+    // guest_hits rules apply to it. This is the ONLY thing that lets the guest
+    // know: the classification lives in the host's world (the stage that spawned
+    // the actor), and the guest has neither the stage nor the spawn-origin hash
+    // -- the load's identity was stripped on the way out (strip_spawn_identity).
+    //
+    // Sending it costs 4 bytes and turns a guess into a fact on the receiving
+    // side. Without it the guest falls back to boss_note_max_hp, which only
+    // fires once the actor is loaded and its maximum HP is readable, i.e. after
+    // the copy exists and possibly after the guest has already hit it.
+    //
+    // The condition is `origin == 3`, which is what strip_spawn_identity returns
+    // for a sequencer-spawned actor (the branch that reads the stage hash at
+    // load+1043 and calls boss_note_spawn_origin). It is NOT origin == 1: that
+    // is the schedule branch, ordinary world spawning, which bosses do not use.
+    // Getting this wrong would have flagged routine schedule spawns as bosses.
+    uint32_t flags = 0;
+    if (origin == 3 || boss_is_boss(key)) flags |= proto::kEnemySpawnFlagBoss;
+    Bytes msg(12);
     std::memcpy(msg.data(), &copy, 4);
+    std::memcpy(msg.data() + 4, &flags, 4);
     const uint32_t n = static_cast<uint32_t>(load.size());
-    std::memcpy(msg.data() + 4, &n, 4);
+    std::memcpy(msg.data() + 8, &n, 4);
     msg.insert(msg.end(), load.begin(), load.end());
     msg.insert(msg.end(), action.begin(), action.end());
     {
@@ -1499,7 +1519,7 @@ RateLimit g_load_rate{8.0, 2.0};
 // Log lines the other side can trigger at will: the first 20, then 1 in 100.
 bool log_turn(uint64_t& n) { return n++ < 20 || n % 100 == 0; }
 uint64_t g_first_action_logged = 0, g_refused_logged = 0, g_odd_control_logged = 0, g_bad_pos_logged = 0, g_removed_logged = 0,
-         g_died_logged = 0;
+         g_died_logged = 0, g_boss_flagged_logged = 0;
 
 // A copy waiting for its turn to be loaded (enemy_tick), with the state
 // messages about it that came meanwhile (its HP is sent right behind it).
@@ -1591,9 +1611,18 @@ bool check_spawn(uint32_t copy, const Bytes& spawn, Bytes& load, Bytes& action, 
         why = "our own player is not known yet";
         return false;
     }
-    const uint32_t n = u32_at(spawn.data() + 4);
-    load.assign(spawn.begin() + 8, spawn.begin() + 8 + n);
-    action.assign(spawn.begin() + 8 + n, spawn.end());
+    // v10 body: u32 copy | u32 flags | u32 load size | load | actions.
+    if (spawn.size() < 12) {
+        why = "the spawn message is shorter than its own header";
+        return false;
+    }
+    const uint32_t n = u32_at(spawn.data() + 8);
+    if (n > spawn.size() - 12) {
+        why = std::format("its load size {} does not fit the {} bytes it arrived with", n, spawn.size());
+        return false;
+    }
+    load.assign(spawn.begin() + 12, spawn.begin() + 12 + n);
+    action.assign(spawn.begin() + 12 + n, spawn.end());
     // u16 len | u8 type | u32 key | u32 owner | ... | +0x14 control user | +0x18 variant
     uint16_t len = 0;
     std::memcpy(&len, load.data(), 2);
@@ -1687,20 +1716,30 @@ void load_copy(WaitingCopy& w) {
 // sender also assumes), and at most 8 at once then 2 a second, so a flood
 // cannot load hundreds of actors in one go (H8).
 // The actions an EnemySpawn carries behind its load (0 if malformed).
+//
+// v10 moved the load size from +4 to +8 to make room for the flags word. The
+// stride and the trailing-action arithmetic are otherwise unchanged, which is
+// why the flags were put in front of the size rather than behind the load.
 size_t spawn_actions(const Bytes& spawn) {
-    if (spawn.size() < 8) return 0;
-    const size_t n = u32_at(spawn.data() + 4);
-    return n <= spawn.size() - 8 ? (spawn.size() - 8 - n) / kStartActionReqSize : 0;
+    if (spawn.size() < 12) return 0;
+    const size_t n = u32_at(spawn.data() + 8);
+    return n <= spawn.size() - 12 ? (spawn.size() - 12 - n) / kStartActionReqSize : 0;
+}
+
+// The flags word of an EnemySpawn (0 when malformed, which reads as "no flags"
+// and is the v9 behaviour).
+uint32_t spawn_flags(const Bytes& spawn) {
+    return spawn.size() >= 12 ? u32_at(spawn.data() + 4) : 0;
 }
 
 // Where an EnemySpawn's load puts its copy (its last Transform), if it has one.
 std::optional<proto::Vec3> spawn_place(const Bytes& spawn) {
     static const uint8_t kMarker[20] = {0x00, 0x00, 0x80, 0x3F, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x00,
                                         0x80, 0x3F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    if (spawn.size() < 8 + 64) return std::nullopt;
-    const size_t n = u32_at(spawn.data() + 4);
-    if (n < 64 || n > spawn.size() - 8) return std::nullopt;
-    const uint8_t* load = spawn.data() + 8;
+    if (spawn.size() < 12 + 64) return std::nullopt;
+    const size_t n = u32_at(spawn.data() + 8);
+    if (n < 64 || n > spawn.size() - 12) return std::nullopt;
+    const uint8_t* load = spawn.data() + 12;
     for (size_t i = n - sizeof kMarker; i > 28; --i) {
         if (std::memcmp(load + i, kMarker, sizeof kMarker) != 0) continue;
         float f[3];
@@ -1840,7 +1879,7 @@ void remove_copy_now(uint32_t copy) {
 }  // namespace
 
 void enemy_on_spawn(const std::vector<uint8_t>& bytes) {
-    if (bytes.size() < 8) return;
+    if (bytes.size() < 12) return;
     if (!g_receive_enabled) {
         static bool told = false;
         if (!told) log::warn("Enemy relay: the other player's enemy copies are refused (no crash guards)");
@@ -1848,16 +1887,33 @@ void enemy_on_spawn(const std::vector<uint8_t>& bytes) {
         return;
     }
     const uint32_t copy = u32_at(bytes.data());
-    const uint32_t n = u32_at(bytes.data() + 4);
+    const uint32_t flags = u32_at(bytes.data() + 4);
+    const uint32_t n = u32_at(bytes.data() + 8);
     if (g_kept_corpses.count(copy)) remove_copy_now(copy);  // its key is used again: the corpse goes
     // Only the net ids a sender hands out (H7), a load of a real size and at
     // most kKeptActions actions behind it.
-    if (!is_valid_enemy_copy_key(copy) || n < 0x40 || n > kMaxLoadSize || 8 + static_cast<size_t>(n) > bytes.size() ||
-        bytes.size() - 8 - n > kKeptActions * kStartActionReqSize) {
+    if (!is_valid_enemy_copy_key(copy) || n < 0x40 || n > kMaxLoadSize || 12 + static_cast<size_t>(n) > bytes.size() ||
+        bytes.size() - 12 - n > kKeptActions * kStartActionReqSize) {
         if (log_turn(g_refused_logged)) {
             log::warn("Enemy relay: malformed enemy copy 0x{:08X} ({} bytes) ignored", copy, bytes.size());
         }
         return;
+    }
+    // The sender classified this copy as a stage boss (v10). Take its word: the
+    // stage that spawned the actor lives in ITS world, so it can see what we
+    // cannot. Recorded against the copy key, which is the key our own guest_hits
+    // sees when it hits the copy, so the boss rules apply from the first blow --
+    // not from whenever the HP fallback happens to notice.
+    //
+    // This is a widening of caution only. Clearing the flag is not possible:
+    // boss_note_max_hp can also raise it, and no path lowers it. A wrong boss
+    // verdict costs the guest the cheat finisher on that enemy; the alternative
+    // (a boss killed outside its stage script) costs the host a stuck quest.
+    if (flags & proto::kEnemySpawnFlagBoss) {
+        boss_note_max_hp(copy, kBossMaxHpX1000);  // same "is a boss" path the HP fallback uses
+        if (log_turn(g_boss_flagged_logged)) {
+            log::info("Enemy relay: copy 0x{:08X} arrived flagged as a boss by the sender; boss rules apply", copy);
+        }
     }
     // A copy already here (or waiting) is not loaded again: a sender removes
     // it first (H8).

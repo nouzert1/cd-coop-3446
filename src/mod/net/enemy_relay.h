@@ -73,8 +73,11 @@ std::optional<proto::EnemyZoneMsg> enemy_zone_update();
 void enemy_drop_copies_here();
 
 // Co-op (network thread): reliable messages to send.
-// EnemySpawn: u32 copy key | u32 load size | load | n x StartActionReq (725 B each,
-// oldest first; n may be 0).
+// EnemySpawn: u32 copy key | u32 flags | u32 load size | load | n x StartActionReq
+// (725 B each, oldest first; n may be 0).
+// The flags word is v10 (protocol.h): kEnemySpawnFlagBoss marks a copy the
+// sender knows is a stage boss, which is what lets the receiver apply the boss
+// rules to it from the first blow instead of waiting for the HP fallback.
 // EnemyRemove: n x u32 copy key.
 // EnemyState: u16 opcode | payload (VaryHPAck, NotifyHandleDeadAck; keys translated).
 std::optional<std::pair<proto::RelKind, std::vector<uint8_t>>> enemy_take_outgoing();

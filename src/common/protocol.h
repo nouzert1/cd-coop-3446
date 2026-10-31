@@ -28,7 +28,28 @@ inline constexpr uint32_t kMagic = 0x504D4443;  // bytes "CDMP"
 // SpawnInfo keeps a removal for each slot the sender's template had filled
 // (equip_state.h); a v6 peer would lose them. 8: TimeSync events. 9: EnemyZone
 // (the guest hides its own enemies near the host, who relays them all).
-inline constexpr uint16_t kVersion = 9;
+// 10: EnemySpawn carries a flags word (kBossFlag). See kEnemySpawnFlags below.
+inline constexpr uint16_t kVersion = 10;
+// ---------------------------------------------------------------------------
+// EnemySpawn, as of v10:
+//
+//     u32 copy key | u32 flags | u32 load size | load | n x StartActionReq
+//
+// The `flags` word is NEW in v10 and it is why the version was bumped. It sits
+// BEFORE the size rather than after the load on purpose: both readers of the
+// body (spawn_actions and spawn_place) already derive the load's extent from
+// the size field, so putting the flags ahead of it means neither has to change
+// its arithmetic -- they read the size from a different offset but the rest of
+// their logic is untouched. Appending the flags at the END would instead have
+// made every action stride and every size check conditional on the version.
+//
+// A v9 peer and a v10 peer disagree about this body and neither can detect it
+// from the bytes, so the version bump is load-bearing, not decorative: the
+// handshake rejects the mismatch before any EnemySpawn is exchanged.
+//
+// `flags` is a bitfield. Zero is the common case (an ordinary enemy) and is
+// exactly the v9 behaviour, so a copy with no flags behaves as it always did.
+inline constexpr uint32_t kEnemySpawnFlagBoss = 0x1;  // the copy is a stage boss
 // Hello and Welcome start the same in every version from 5 (name, then the
 // rest), so a peer with another version is recognised and reported instead
 // of being ignored in silence.
