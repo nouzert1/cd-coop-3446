@@ -196,3 +196,29 @@ all four in one `&&` chain and installs none if any fails. So the crash is not f
 
 It does mean the hardest of the four is now identified, and the method that found it is
 written down and reproducible.
+
+THE CONSTRUCTOR, AND A FIELD THE UPDATE USES
+-------------------------------------------
+
+Worth recording because it is new and it constrains where the remaining two can be.
+
+The CC vtable at exe+0x59388D0 is referenced from exactly two places:
+
+  exe+0x940702   inside the constructor, which starts at exe+0x9406E0 (the function
+                 right after the CC padding at exe+0x9406D0)
+  exe+0x9528E3D  a second constructor-like body, which also writes the vtable to [rcx]
+                 and then chains into exe+0x3D7240 twice
+
+The constructor writes the vtable to [rdi] and then zeroes [rdi+0xB8] and [rdi+0xC0]. It
+does NOT touch +0x08, +0x40, +0x80, +0x88, +0x90 or +0xA8 -- so the read_state fields are
+established later, not at construction, consistent with the layers being created once the
+actor is attached.
+
+Then the observation that matters: kCcUpdate reads [rbx+0xB8] twice (`mov rdi, [rbx+0xB8]`
+at exe+0x941DC3 and again in its second block). So +0xB8 is a member the constructor zeroes
+and the update dereferences -- a pointer the update expects to be valid once the component
+is live. That makes +0xB8 the best remaining discriminator for the two missing sites: a
+function reading BOTH [this+0xB8] and the read_state offsets is operating on the same
+component at the same stage, which is what kCcPost should look like.
+
+Not enough on its own this session. Written down as the next thing to try, not as a result.
