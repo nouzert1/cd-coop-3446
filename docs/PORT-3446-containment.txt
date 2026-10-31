@@ -222,3 +222,82 @@ function reading BOTH [this+0xB8] and the read_state offsets is operating on the
 component at the same stage, which is what kCcPost should look like.
 
 Not enough on its own this session. Written down as the next thing to try, not as a result.
+
+THE BREAKTHROUGH: A 3424 EXECUTABLE SURVIVED ON DISK
+----------------------------------------------------
+
+The whole session had been treating the 3424 addresses as known points and their bytes as
+the only anchor. That was the hard way round. A copy of the old executable was sitting at
+
+  C:\Users\ACER\Downloads\Mods\CD-ref\_scan\CrimsonDesert.exe   (320.7 MB)
+  PE timestamp 0x6AE387F2 -> build 1.0.0.3424
+
+so the two builds can be DIFFED instead of guessed at. Everything below came from that.
+
+kCcPost = exe+0x860D60, SOLVED
+
+The 3424 site is a MID-HOOK, not a function entry: 0x860D30 sits +0x110 into a body that
+starts at 0x860C20. Reading only the 16 prologue bytes in Site therefore told us far less
+than it appeared to - the bytes at that address are the middle of a function, and the
+"prologue" recorded for the 3424 was really an interior fragment.
+
+Diffing the bodies instruction by instruction shows the function barely moved:
+
+  3424 exe+0x860C20   push rbp / push rsi / push rdi / push r12 ... sub rsp, 0x50
+  3446 exe+0x860C50   identical, shifted by exactly 0x30
+
+Same pushes in the same order, same `sub rsp, 0x50`, same `mov rbx, r9`, same
+`mov dword ptr [r14+0x08], 0`, same `[rdx+0x108]` load, same `test dword ptr [rax+0x68],
+0x2000`. Only the branch displacements differ (the jz target is 0x860DEB here against
+0x860DBB there), which is what a 0x30 shift does to relative jumps.
+
+The mid-hook point is +0x110 into the body in BOTH builds, and its 16 bytes are IDENTICAL:
+
+  0F 85 B6 00 00 00 4C 89 6C 24 28 80 7C 24 38 00
+
+That is what goes in the Site, and the per-site prologue check verifies it at install
+time. Where a function moved but its interior did not, the interior bytes are the better
+anchor than any prologue - the opposite of what this file assumed for most of the session.
+
+It also corrects a wrong assumption: kCcPost was assumed to read the layer chart (+0x110)
+because on_cc_post does. It does not. The mod reproduces that logic in C++; the game is
+under no obligation to read the field the same way. kCcUpdate - the function this pass
+follows - never touches +0x110 at all. Time was spent scanning for a chart read that was
+never there, and the negative result that "no CC function reads +0x110" was read as
+evidence about where kCcPost lives, when it was evidence about a wrong premise.
+
+kPending - NOT SOLVED, and now understood differently
+
+The 3424 site 0x2329D70 is also a mid-hook (the `jz` at the end of a `cmp [rsi], r15b`) in
+a body starting at exe+0x2329D20. Two things are now measured about it:
+
+  * It does NOT touch the component struct at all. Over 300 instructions it reads none of
+    +0x80, +0x88, +0x90, +0xA8 or +0x60 - the fields every other site is built around,
+    and the fields read_key and read_state need. Whatever this function is, it is not
+    operating on a ClientCharacterControl.
+  * It is referenced twice, both by `lea` rather than `call`:
+
+      exe+0x163CEF8   lea rdx, [kPending] ; lea rcx, [rbp+0x568] ; call 0x1659140
+      exe+0xB194D53   lea rax, [kPending] ; mov [rbx+0x20], rax
+
+    so it is installed into a vtable-like structure, not invoked virtually by the
+    component. At 0xB194D49 the enclosing code writes a vtable (0x5ABAFC0) to [rbx] and
+    then the function to [rbx+0x20].
+
+  Its 32-byte prologue is NOT distinctive: scanning it in 3446 returns 10 matches, and
+  the interior pattern `4C 8D 85 90 00 00 00 48 8B D1 E8` returns 20+ spread at regular
+  intervals (0x231D602, 0x231DAC2, 0x231DDF2, ...) - a family of compiler-generated
+  siblings from one template. Neither narrows to the right one.
+
+  IMPORTANT: on this evidence the kPending site as recorded is probably WRONG for what
+  horse_diag.cpp wants. The hook calls read_key(ctx.rcx) and read_state(ctx.rcx), which
+  require rcx to be a ClientCharacterControl - but the 3424 function at 0x2329D20 does not
+  touch that struct. Either the 3424 address was never observing what was assumed, or the
+  function's signature changed shape entirely. This needs resolving before installing a
+  hook there, because a mid-hook on a function that does not take a CC would read garbage
+  through read_state. It fails safe only by luck (safe_read is guarded), not by design.
+
+  The way to finish it: the two `lea` references are the thread. Find the 3446 code that
+  writes a vtable to [rbx] and then a function pointer to [rbx+0x20], and read the
+  function it installs - the diff method that solved kCcPost should work here too, since
+  it is a data reference rather than a prologue.

@@ -55,10 +55,26 @@ struct Site {
 // CHANGED between builds (0x4B30 on 3424, 0x6500 here), which is the second independent
 // reason a fixed delta cannot be used to port these - the first being the 0x35 spread
 // this port already measured across the globals.
+//   kCcPost    exe+0x860D60 - found by DIFFING the two builds, which is now possible
+//         because a copy of the 1.0.0.3424 executable survived on disk
+//         (CD-ref/_scan/CrimsonDesert.exe, PE timestamp 0x6AE387F2). Comparing the
+//         two showed the whole function barely moved: the 3424 body at exe+0x860C20
+//         and the 3446 body at exe+0x860C50 are the same code instruction for
+//         instruction, just shifted by 0x30, with branch displacements adjusted.
+//         The mid-hook point is +0x110 into that body in both builds, and its 16
+//         bytes are IDENTICAL (0F 85 B6 00 00 00 4C 89 6C 24 28 80 7C 24 38 00),
+//         which the per-site prologue check will verify at install time.
+//
+//         This also corrects a wrong assumption made earlier in the session: it was
+//         assumed kCcPost must read the layer chart (+0x110) because on_cc_post
+//         does. It does not. The mod reproduces that logic in C++; the game is not
+//         obliged to read the field the same way, and kCcUpdate - the very function
+//         this pass follows - never touches +0x110 at all. Searching for a chart
+//         read was searching for something that was never there.
 constexpr Site kCcUpdate = {0x941D40, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57, 0x48,
                                        0x83, 0xEC, 0x20, 0x48}, "CC update"};
-constexpr Site kCcPost = {0x860D30, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x56, 0x57,
-                                     0x41, 0x56, 0x48, 0x83}, "CC post-update"};
+constexpr Site kCcPost = {0x860D60, {0x0F, 0x85, 0xB6, 0x00, 0x00, 0x00, 0x4C, 0x89, 0x6C, 0x24, 0x28, 0x80,
+                                     0x7C, 0x24, 0x38, 0x00}, "CC post-update"};
 constexpr Site kRestore = {0x948240, {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x20, 0x48, 0x89, 0x50, 0x10, 0x55,
                                       0x56, 0x57, 0x41, 0x54}, "restore actions"};
 constexpr Site kPending = {0x2329D70, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89,
