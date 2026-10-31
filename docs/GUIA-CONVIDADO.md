@@ -333,6 +333,34 @@ travou, o dano não contou.
 
 ## PARTE 7 — Mandar o resultado
 
+### 7.0 ⭐ O jeito mais fácil: rode o diagnóstico
+
+Um script faz **tudo** de uma vez — confere a instalação, lê a configuração, analisa o log inteiro e
+escreve um relatório pronto para mandar.
+
+**Feche o jogo primeiro** (o mod mantém o log aberto enquanto roda):
+
+```powershell
+Get-Process CrimsonDesert -ErrorAction SilentlyContinue | Stop-Process
+```
+
+Depois:
+
+```powershell
+cd $env:USERPROFILE\Downloads
+Invoke-WebRequest "https://raw.githubusercontent.com/nouzert1/cd-coop-3446/master/scripts/diagnostico-convidado.ps1" -OutFile diagnostico.ps1
+powershell -ExecutionPolicy Bypass -File .\diagnostico.ps1
+```
+
+**Ele cria um arquivo na sua Área de Trabalho:**
+
+```
+cdmp-diagnostico-2026-10-31-1730.txt
+```
+
+**Mande esse arquivo inteiro para o anfitrião.** Ele responde sozinho as perguntas abaixo — você não
+precisa interpretar nada.
+
 ### 7.1 Se o jogo fechar sozinho — capture isto IMEDIATAMENTE
 
 ```powershell
