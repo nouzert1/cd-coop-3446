@@ -55,14 +55,26 @@ while ($off + 24 -le $bytes.Length) {
     if ($off + $copied -gt $bytes.Length) { break }
     if ($copied -lt $size) { $notSold++ }
 
-    # So' as cargas de ator do servidor para o cliente
-    if ($copied -ge 5 -and $dir -eq 1) {
+    # So' as cargas de ator, e SO' do servidor para o cliente.
+    #
+    # O 2 aqui NAO e' um chute: troc_sniffer.cpp:35 diz `enum class Dir : uint8_t {
+    # ClientToServer = 1, ServerToClient = 2 }`. A primeira versao deste script testava
+    # `-eq 1` e por isso relatou "cargas vistas: 0" sobre uma captura que tinha 1029 delas --
+    # um resultado que parecia uma descoberta (o jogo nao manda cargas no 3446!) e era so' um
+    # filtro invertido. A licao vale para o resto: um zero so' significa alguma coisa depois
+    # que a ferramenta que o produziu foi conferida contra uma fonte que nao seja ela mesma.
+    if ($copied -ge 5 -and $dir -eq 2) {
         $op = [BitConverter]::ToUInt16($bytes, $off)
         if ($op -eq $KOpActorLoadDataAck) {
             $n++
             $payload = $copied - 5
             if ($payload -gt $biggest) { $biggest = $payload }
-            $t = $bytes[$off + 7]     # u16 len | u8 type
+            # Layout do payload de uma carga (native_suppress.cpp:961):
+            #   u16 len | u8 type | u32 key | u32 owner | ...
+            # Ou seja: len em +0, type em +2. Ler o type em +7 (como a primeira versao fazia)
+            # devolvia 0 em tudo e as cargas tipo 3/6 nunca eram contadas -- um segundo zero
+            # falso, na mesma funcao, escondido atras do primeiro.
+            $t = $bytes[$off + 2]
             if (-not $types.ContainsKey($t)) { $types[$t] = 0 }
             $types[$t]++
             if ($t -eq 3 -or $t -eq 6) {
