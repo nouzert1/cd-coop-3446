@@ -7,7 +7,83 @@ Build 1.0.0.3446 (PE `0x6AE46DD0`).
 
 ---
 
-## O sintoma
+## TRÊS defeitos, não um
+
+O relevo ficou morto por **três causas independentes**, todas encontradas nesta sessão. Cada
+uma sozinha bastava para desligá-lo, e cada uma **falhava em segurança** — deixando a sessão
+com aparência perfeitamente normal.
+
+| # | defeito | onde | consequência |
+|---|---|---|---|
+| 1 | assinaturas dos guards não batiam em build nenhum | `offsets_3446.h` | `puppet_install_layer_guards()` → `false` → `enemy_set_receive_enabled(false)` |
+| 2 | endereços com valores de 3424 | `offsets_3446.h` | idem |
+| 3 | **a thread testava a flag de DEV** | `mod.cpp:787` | o loop nunca subiu; `g_auto` ficou setado e **ninguém leu** |
+
+O terceiro é o mais instrutivo:
+
+```cpp
+// ANTES
+if (init->enemy_relay && guarded) { /* sobe a thread */ }
+// init->enemy_relay = in_game && cfg.dev_enemy_relay   <- [dev], default FALSE
+```
+
+A flag que o **usuário** configura, `[coop] enemy_auto` (default `true`, lida em
+`config.cpp:199`), **nunca era consultada ali**. E o `run_network` chamava
+`enemy_set_auto(cfg.coop_enemy_auto)` corretamente, então:
+
+- `g_auto` era setado ✅
+- o log de config não mostrava erro ✅
+- o guard de crash instalava ✅
+- e **nada consumia `g_auto`**, porque o loop que o lê não existia ❌
+
+> **Uma flag que é escrita e nunca lida é indistinguível de uma função que funciona** — até
+> alguém procurar a saída dela.
+
+---
+
+## LIMITE DO TESTE DE ECO (descoberto na rodada 33)
+
+**O teste de eco NÃO consegue exercitar o relevo de inimigos.** Não é um defeito do mod — é
+uma limitação do `cdmp_peer`.
+
+`auto_tick()` (`enemy_relay.cpp:1030`) começa assim:
+
+```cpp
+PartnerZone zone;
+{ std::lock_guard lock(g_mutex); zone = g_partner_zone; ... }
+if (zone.on && !zone.dry) { zone_tick(...); return; }
+```
+
+E `g_partner_zone` **só é setado por `enemy_on_zone_request`** (linha 1367) — a mensagem
+`EnemyZoneMsg` que **o convidado envia** dizendo onde ele está e o que quer copiado.
+
+O `cdmp_peer` tem três modos, `relay` / `ghost` / `bot`, e **todos ecoam**. Nenhum gera
+mensagem de zona, porque a zona é derivada da **posição do convidado no mundo dele** — algo
+que um eco não tem.
+
+Logo: com o peer, `zone.on` é sempre `false`, e `auto_tick` **retorna sem fazer nada** a cada
+500 ms. O relevo está armado, o loop roda, e não há o que copiar porque **ninguém pediu nada**.
+
+### O que isto significa para o plano de teste
+
+| o que o eco prova | o que o eco NÃO prova |
+|---|---|
+| o boot instala os guards | a zona chegando do parceiro |
+| a thread do relevo sobe | `zone_tick` escolhendo inimigos |
+| `g_auto` sendo lido | cópias aparecendo |
+| a cópia do jogador, movimento, equipamento | loot compartilhado, golpes, jefes |
+
+**O relevo de inimigos — e com ele o loot compartilhado, os golpes do convidado e o dano
+conjunto em jefes — só se prova com DOIS jogadores reais.** O eco chegou ao fim do que podia
+provar.
+
+Para o teste de 2 PCs, o `[coop] suppress=dry` faz o convidado pedir a zona **registrando o
+que copiaria** sem copiar nada. É o primeiro teste a rodar: as linhas `WOULD SWEEP` do
+convidado e `WOULD copy N of M` do host têm que **casar**.
+
+---
+
+## O sintoma (primeira descoberta)
 
 Numa sessão inteira de eco, com o mundo carregado e a cópia do outro jogador visível:
 

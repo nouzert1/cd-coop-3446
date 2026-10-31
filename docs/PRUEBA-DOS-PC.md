@@ -149,11 +149,25 @@ running their own copy of the fight is a much bigger job.
 
 Within 150 m of A, I stops seeing **their own** hostile enemies and sees only the copies of
 A's; beyond 170 m their own come back. Design: `docs/research/fase5-suprimir-enemigos-invitado.md`.
-Before this, the one-PC test in `docs/PRUEBAS-COOP.md` (zone in dry run) must have gone well.
+
+**THIS IS THE FIRST TEST THAT CAN EXERCISE THE ENEMY RELAY AT ALL.** The one-PC echo test
+cannot: `auto_tick()` needs `g_partner_zone`, which is only ever set by the guest's
+`EnemyZoneMsg`, and `cdmp_peer` has no mode that produces one -- all three of its modes merely
+echo. So with the peer the relay is armed, the loop runs, and there is nothing to copy because
+nobody asked. See the "LIMITE DO TESTE DE ECO" section of
+`docs/RELEVO-INIMIGOS-NUNCA-LIGOU.md`.
+
+Before this, the one-PC test in `docs/PRUEBAS-COOP.md` only proves the relay STARTS -- look
+for `Enemy relay: Ctrl+F6 = copy...` and the absence of `Enemy copies disabled`. Nothing more.
 
 - **Preparation.** Back up the saves **on both**. `[sniffer] record=1` on both.
   - I: in their `cdmp.ini`, `[coop] suppress=1` (the kit ships `dry`, which only writes to the log).
-  - A: nothing (it needs `enemy_auto=1` and `[dev] enemy_relay=1`, which the kit already ships).
+  - A: **nothing.** `[coop] enemy_auto=1` is the only switch, it already defaults to on, and the
+    kit ships it. `[dev] enemy_relay=1` is NOT needed and this document used to say it was --
+    that instruction came from the bug fixed on 2026-10-30, where the relay thread tested the
+    dev switch instead of the user's. If A's log does not show
+    `Enemy relay: Ctrl+F6 = copy the enemy you hit`, `enemy_auto` is 0 or the build predates
+    the fix; setting the dev key would only mask it again.
 - **Place:** the Bleed Bandits camp near (−10.284, 640, −3.383)
   (`cd_m11_m04_monster_beacon_01_0003`) or `Node_Her_EmbernestBeacon` (−10.201, 623, −3.481).
 - In I's panel (F8) a line shows: "Host's enemies (150 m zone)" inside the zone and

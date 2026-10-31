@@ -22,6 +22,17 @@ $cmakeBin = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bi
 $cmake = Join-Path $cmakeBin 'cmake.exe'
 $ctest = Join-Path $cmakeBin 'ctest.exe'
 
+# The build id is written by `configure_file`, which CMake only re-runs when the INPUT
+# changes -- not when HEAD moves. So without this the binary keeps reporting the commit the
+# last configure happened to see.
+#
+# This bit me on 2026-10-30: a fresh build reported "build 0DBA86A6 + local changes" while
+# the correctly-fixed binary was installed and running, which reads exactly like a stale
+# install and sends you chasing the wrong thing. The running code was right; only the label
+# was old. Deleting the generated header forces the regenerate.
+$idHeader = Join-Path $root 'build\generated\build_id.h'
+if (Test-Path $idHeader) { Remove-Item $idHeader -Force }
+
 & $cmake -S $root -B "$root\build" -G 'Visual Studio 17 2022' -A x64 -Wno-dev -Wno-deprecated
 if ($LASTEXITCODE) { throw "CMake configure failed ($LASTEXITCODE)" }
 
