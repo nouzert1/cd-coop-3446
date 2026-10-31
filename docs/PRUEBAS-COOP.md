@@ -84,6 +84,27 @@ a zone around you on or off (no host; automatic copies stay off).
 - L1: with `suppress_lab_radius_m=250`, turn it on more than 250 m from the camp and approach → the
   camp does not appear (`dropped load`).
 
+### What the lab DOES prove, and what it cannot
+
+This is the strongest test available on ONE PC, and it is worth being exact about its reach,
+because the echo test's limits were mis-documented once already (see L0b above).
+
+The lab does not fake the zone -- it drives the REAL `EnemyZoneMachine`, with `z.linked =
+g_lab_on` and `z.host = in.me` (native_suppress.cpp:1115-1118). So it exercises the actual
+hiding and restoring code on real natives, which is the hard part of phase 5.
+
+| the lab proves | the lab cannot prove |
+|---|---|
+| enemies are really hidden (`removed group`) | a zone arriving from ANOTHER player |
+| they come back intact (`restored group`, `login +CF 1`) | the host's half of the handshake |
+| they still fight after restoring | `auto_tick` picking and copying enemies |
+| the load-drop radius behaves | shared loot, guest hits, joint boss damage |
+| the breaker trips safely on a bad state | anything that needs two SteamIDs |
+
+So the lab settles "does hiding and restoring enemies work at all", and two PCs are still
+required for everything downstream of it. Run the lab first: if it fails, the two-PC zone test
+cannot pass either, and this costs one session instead of two.
+
 ## If something goes wrong
 - **The horse causes problems:** `[coop] horse=0` in `cdmp.ini`.
 - **Something odd in general:** `[coop] enabled=0` disables all of co-op.

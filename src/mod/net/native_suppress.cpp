@@ -861,7 +861,10 @@ void suppress_configure(const SuppressSettings& s) {
               s.mode == SuppressMode::On ? "ON" : "DRY RUN (only logs what it would hide)", radius, off,
               s.restore ? "on" : "off", s.restore_state ? "on" : "off", s.wait_fight_s, s.respawn_grace_s,
               s.node_events ? "on" : "off",
-              s.lab ? " | LAB: Ctrl+Home turns a zone around you on and off (no host, no relay)" : "");
+              s.lab ? " | LAB: Ctrl+Home turns a zone around you on and off (no host, no relay). "
+                      "SAVE FIRST: this writes to the game. If 'Suppress: BREAKER' appears, Ctrl+Home "
+                      "stops working for the rest of the session -- restart the game to retry."
+                    : "");
 }
 
 SuppressMode suppress_mode() { return g_mode.load(); }
