@@ -127,6 +127,36 @@ foreach ($name in 'cdmp.asi', 'cdmp.ini', 'winmm.dll', 'dinput8.dll') {
     }
 }
 
+# O hash e' a unica forma de saber QUAL kit esta' instalado: o nome do arquivo e' sempre o
+# mesmo entre versoes, e um kit velho nao se denuncia sozinho. Ja custou uma rodada de teste
+# inteira -- um agente leu um INSTALL.md antigo, concluiu que o binario nao existia, e
+# propos fazer downgrade do jogo.
+Add-Line
+Add-Line "  QUAL KIT ESTA' INSTALADO:"
+$known = @{
+    '556D46C4152AD70A0374898EBE21C3381EC011D655C4CCF72FE1EAA92DD1BDDB' = @('atual', 'v0.16.0-3460 -- o kit certo')
+    '70C5436365410668ED5998BB446DA4A11304A903BCC2A5AE90128EA0DD308FBE' = @('velho', 'de 31/10 15:55, ANTES da correcao do crash')
+    'E196DAB4302D48C9597C678F14A0F23C217F02D913D74E075CC4CDE834F2E33A' = @('velho', 'intermediario, ANTES da instrumentacao')
+    '5B69B7648705B27F197489FEA7AF38D97D220C6ACE5F99AAE82682A77B759633' = @('velho', 'intermediario')
+}
+$asiPath = Join-Path $GameDir 'cdmp.asi'
+if (Test-Path $asiPath) {
+    $h = (Get-FileHash $asiPath -Algorithm SHA256).Hash
+    if ($known.ContainsKey($h)) {
+        $k = $known[$h]
+        Add-Line "  $($k[0].ToUpper()): $($k[1])"
+        if ($k[0] -eq 'velho') {
+            Add-Line "    -> Baixe a v0.16.0-3460 e copie por cima:"
+            Add-Line "       https://github.com/nouzert1/cd-coop-3446/releases"
+            Add-Line "       Sem isto o crash do spawn continua, e o log nao vai dizer por que."
+        }
+    } else {
+        Add-Line "  desconhecido: $h"
+        Add-Line "    -> Nao e' nenhum kit deste projeto, ou foi compilado localmente."
+        Add-Line "       Se voces nao compilaram, baixe a v0.16.0-3460."
+    }
+}
+
 Add-Line
 Add-Line "  DIAGNOSTICO DE INSTALACAO:"
 $have = @('cdmp.asi', 'cdmp.ini', 'winmm.dll') | Where-Object { Test-Path (Join-Path $GameDir $_) }

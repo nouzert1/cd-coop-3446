@@ -101,7 +101,20 @@ pode ser de outro mod, e sobrescrever quebra os dois.
 
 ### 2.3 Copiar os 3 arquivos
 
-Extraia o zip em algum lugar (Área de Trabalho serve) e depois:
+**Baixe o zip** — link direto, já com o kit de convidado:
+
+```
+https://github.com/nouzert1/cd-coop-3446/releases/download/v0.16.0-3460/cdmp-3460-test-kit.zip
+```
+
+Ou, se preferir a página: [**releases**](https://github.com/nouzert1/cd-coop-3446/releases) →
+`v0.16.0-3460`.
+
+> ⚠️ **Só use a `v0.16.0-3460`.** Todas as releases anteriores (`v0.15.0-3446` e abaixo) são de
+> outra versão do jogo e **não funcionam** — o mod carrega, conecta, e nenhum personagem aparece.
+> É o erro que já travou um teste.
+
+Depois de baixar:
 
 ```powershell
 $zip     = "$env:USERPROFILE\Downloads\cdmp-3460-test-kit.zip"   # ajuste se estiver noutro lugar
@@ -173,17 +186,24 @@ mundo. Se estiver `0`, vocês conectam mas você **não vê o boneco**.
 
 ```powershell
 $game = "C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64"
+Write-Host "cdmp.asi  (o mod):"
+Get-FileHash "$game\cdmp.asi" -Algorithm SHA256 | Select-Object -ExpandProperty Hash
+Write-Host "winmm.dll (o carregador):"
 Get-FileHash "$game\winmm.dll" -Algorithm SHA256 | Select-Object -ExpandProperty Hash
 ```
 
-**Tem que dar:**
+**Tem que dar exatamente:**
 
-```
-E196DAB4302D48C9597C678F14A0F23C217F02D913D74E075CC4CDE834F2E33A
-```
+| Arquivo | SHA256 |
+|---|---|
+| `cdmp.asi` | `556D46C4152AD70A0374898EBE21C3381EC011D655C4CCF72FE1EAA92DD1BDDB` |
+| `winmm.dll` | `031A3E5576D91DCE1E438D36B9A3D462C7334AB4791990A8FF1E3DDC0E132DAF` |
 
-> **Atenção:** esse é o hash do `cdmp.asi` do kit atual. Se você baixou uma versão anterior, o número
-> será diferente — nesse caso use o `SHA256SUMS.txt` que veio no seu zip.
+**Se o `cdmp.asi` der `70C54363…` ou `E196DAB4…`, você está com um kit anterior** — foi o que
+aconteceu em 31/10 e custou uma rodada de teste inteira. Baixe a `v0.16.0-3460` de novo.
+
+> O `SHA256SUMS.txt` dentro do zip lista os três arquivos. Se algum número não bater com o que
+> está no disco, a cópia falhou — copie de novo.
 
 ---
 
