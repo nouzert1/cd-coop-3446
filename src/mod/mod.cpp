@@ -335,6 +335,9 @@ void run_network(const Config& cfg, LocalSource& local) {
     // same moment ("now!") so their logs can be lined up afterwards.
     bool mark_was_down = false;
     int marks = 0;
+    // Has the other side's position ever been a real place? See the Net: report below.
+    bool remote_seen_valid_ = false;
+    int remote_zero_updates_ = 0;
     std::vector<uint8_t> buf(proto::kMaxPacketSize);
 
     while (!stop_requested()) {
@@ -499,6 +502,30 @@ void run_network(const Config& cfg, LocalSource& local) {
             if (const auto& rs = session.remote_state()) {
                 remote = std::format("({:.2f}, {:.2f}, {:.2f}) hp {:.1f}", rs->pos.x, rs->pos.y,
                                      rs->pos.z, rs->health);
+                // Remember whether the OTHER side's position has EVER been usable. The
+                // 2-PC test of 2026-10-31 showed (0,0,0) in all 216 updates and it was
+                // impossible to tell from this side whether their world was still loading
+                // (a timing problem) or their reader was returning zero (a broken port) --
+                // the two need completely different fixes, and the log did not say which.
+                // One flag settles it: if the position was ever non-zero, the reader works.
+                const bool zero_now = std::fabs(rs->pos.x) < game::build_3460::kLoadingParkRadius &&
+                                      std::fabs(rs->pos.y) < game::build_3460::kLoadingParkRadius &&
+                                      std::fabs(rs->pos.z) < game::build_3460::kLoadingParkRadius;
+                if (!zero_now) remote_seen_valid_ = true;
+                else if (!remote_seen_valid_) ++remote_zero_updates_;
+                if (!remote_seen_valid_) {
+                    // A count of zero would read as "we measured and it never happened",
+                    // when it actually means "no state arrived at all yet". Those are
+                    // different facts, so say which one it is.
+                    remote += remote_zero_updates_ == 0
+                                  ? " [NO STATE YET]"
+                                  : std::format(" [NEVER VALID: {} updates, all at the origin]",
+                                                remote_zero_updates_);
+                }
+            } else if (st.remote_states > 0) {
+                // States arrived earlier and the last one has been dropped. Without this
+                // the log reads "last remote none" and looks like the peer went quiet.
+                remote = std::format("(none right now; {} arrived earlier)", st.remote_states);
             }
             log::info("Net: {} | sent {} recv {} rejected {} | rtt {:.1f} ms | remote states {} | "
                       "last remote {} | reliable pending {} refused {} | unknown kinds {} | {}",

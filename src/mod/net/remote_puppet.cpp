@@ -1095,13 +1095,24 @@ bool puppet_spawn(const proto::SpawnInfo& info) {
     // second line, because a malformed packet from any source must not be able to take
     // down the game that receives it. The receiver can see the bytes; it cannot see
     // whether the sender's world had finished loading.
+    //
+    // This used to say "their world is probably still loading" -- a guess dressed as a
+    // finding. It is one of two very different faults, and they are told apart by
+    // whether the sender's position EVER left zero, which this side cannot see and the
+    // sender's log can. So report what was measured and name both readings.
     if (std::fabs(info.pos.x) < off::kLoadingParkRadius &&
         std::fabs(info.pos.y) < off::kLoadingParkRadius &&
         std::fabs(info.pos.z) < off::kLoadingParkRadius) {
         std::lock_guard lock(g_mutex);
         g_spawned = false;
-        log::warn("Puppet: the other player's position is the world origin; not loaded "
-                  "(their world is probably still loading)");
+        log::warn("Puppet: spawn refused, position is the world origin (0,0,0) -- sender {} "
+                  "player 0x{:08X} generation {}. Either their world was still loading, or "
+                  "their position reader is returning zero. Tell them apart with THEIR log: "
+                  "if 'Local: pos' there ever showed a non-zero number, the reader works and "
+                  "the send happened too early; if it only ever showed (0.00, 0.00, 0.00), the "
+                  "reader is the fault.",
+                  info.generation > 1 ? "re-announced" : "first announcement",
+                  info.player_key, info.generation);
         return false;
     }
     const float pos[3] = {info.pos.x + g_offset_x, info.pos.y, info.pos.z};
