@@ -233,7 +233,43 @@ inline constexpr uintptr_t kTrocInstancesEnd = 0x6EBA378;    // 3446:0x6EB6378
 // slots is a property of this game, not an artefact of a bad measurement, and picking
 // the one that merely looks closest to the old address is not a method.
 
-// ---- data globals: STILL SUSPECT ----------------------------------------
+// ---- the position moved from a pointer chase to an INLINE field ------------
+//
+// The chain the 3424/3446 headers describe ends with a physics OBJECT reached through
+// kControlInner_Physics and a position read at kPhysics_Position inside it. That no
+// longer holds on 3460. Two independent readings say so:
+//
+//   * `dump` on inner[+0x2C0] shows POINTERS (it labels them "ptr"), not a position.
+//     Following that path lands on (1.0, 0.0, 0.1745) -- a normalised direction vector,
+//     which is a perfectly well-formed number that is not a position.
+//   * The real position is at inner+0x460, as INLINE floats:
+//         +0x460: (-20549.8086, 587.6920, -6922.1904)   world position
+//         +0x46C: (      -0.6117,   0.6849,     0.3960)   direction (unused here)
+//
+// PROVED BY MOTION, not by plausibility. Two readings 15 seconds apart with the player
+// walking gave X -20549.81 -> -20517.74, Y 587.69 -> 579.16, Z -6922.19 -> -6952.50:
+// about 45 m of travel. A value that tracks the character is the position. A value that
+// merely looks like a coordinate is not -- and this port produced two of those
+// (kStaticPlayerPos reads -88.3066 as f32 and is a pointer; the 0x2C0 chase above
+// returns a direction vector).
+//
+// kControlInner_Physics is therefore LEFT AT ITS 3446 VALUE AND UNUSED. It is not
+// corrected to 0x460 because that would assert the field is a pointer reached through
+// the same structure, and the evidence says it is not: the offset is inside `inner`
+// itself. Keeping the wrong pointer offset and adding the inline one separately means a
+// future reader can see which is which instead of trusting a repaired number.
+inline constexpr uintptr_t kControlInner_Physics = 0x2C0;  // 3446 value; NO LONGER a position
+
+// kControlInner_Physics is NOT re-exported from 3446: it is restated below with a note,
+// because on this build the value is still present but no longer means what its name
+// says. A `using` would have carried the old number across with the old name intact and
+// no indication that the field moved.
+
+// Position of the local player inside the control's inner object, as three inline floats.
+// Measured live on 3460 and confirmed to track the character (see above).
+inline constexpr uintptr_t kControlInner_Position = 0x460;
+
+
 //
 // These carry their 3446 values and are UNVERIFIED on 3460. The list shrank this round:
 // kWorldSystemSlot is now measured (above), and the chain from it to a position was
@@ -310,7 +346,6 @@ using build_3446::kCamera_Block;
 using build_3446::kClientClockHead;
 using build_3446::kComponents_CharacterControl;
 using build_3446::kComponents_Status;
-using build_3446::kControlInner_Physics;
 using build_3446::kControl_Inner;
 using build_3446::kControl_Layer0;
 using build_3446::kControl_MoveController;

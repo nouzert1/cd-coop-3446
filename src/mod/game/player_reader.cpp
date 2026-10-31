@@ -171,50 +171,44 @@ std::optional<PlayerSnapshot> PlayerReader::read() {
         return fail("CharacterControl component missing");
     auto inner = read_ptr(*control + off::kControl_Inner);
     if (!inner) return fail("control inner missing");
-    auto physics = read_ptr(*inner + off::kControlInner_Physics);
-    if (!physics) return fail("physics object missing");
-    // The vtable RVA is a code address this port could not re-derive offline
-    // (kVtPhysicsObject == 0 means "unknown"), so it is only enforced when known.
-    // The orthonormal-basis and static-position checks below are the real proof.
-    if (off::kVtPhysicsObject != 0 && !has_vtable(*physics, base_ + off::kVtPhysicsObject)) {
-        return fail("physics object missing");
-    }
 
-    auto local = read_vec3(*physics + off::kPhysics_Position);
-    auto origin = read_vec3(base_ + off::kChunkOrigin);
-    auto ax = read_vec3(*physics + off::kPhysics_AxisX);
-    auto ay = read_vec3(*physics + off::kPhysics_AxisY);
-    auto az = read_vec3(*physics + off::kPhysics_AxisZ);
-    if (!local || !origin || !ax || !ay || !az) return fail("physics data unreadable");
+    // The position is INLINE in the inner object on this build, not behind the physics
+    // pointer the older tables describe. Measured live and proved by motion: two reads
+    // 15 s apart with the player walking moved it ~45 m. See offsets_3460.h
+    // (kControlInner_Position) for the reading and for why the old pointer route is
+    // kept but unused -- chasing it yields a normalised direction vector, which looks
+    // like a result and is not one.
+    auto local = read_vec3(*inner + off::kControlInner_Position);
+    if (!local) return fail("position unreadable");
 
-    // The basis is a SEPARATE field from the position, and a bad basis must not
-    // cost us the position.
-    //
-    // This used to return early on a non-orthonormal basis, which threw away a
-    // perfectly good position read in the same call. In the first two-PC test the
-    // host's log alternated "in world" and "physics basis not a rotation", and
-    // every failure dropped that sample: the position the guest received stalled
-    // on one value for tens of seconds at a time and jumped 10-20 m when it did
-    // move ("Local: pos (-10606.81, 620.70, -3826.01) | check vs game global
-    // 0.05 m" -- the read was correct to 5 cm and frozen). The guest's panel still
-    // showed a distance, because the last good sample stayed on screen, and the
-    // character was drawn nowhere useful.
-    //
-    // The tolerance is also widened to match camera_reader.cpp, which already
-    // uses 0.05f for the same kind of game-provided basis: 0.02f is tight for
-    // physics axes that have been through the game's own float math.
-    const bool basis_ok = math::is_orthonormal(*ax, *ay, *az, 0.05f);
+    // kPhysics_Position/axis reads are gone with the pointer route. The rotation now
+    // comes from the direction triple that sits immediately after the position; it is
+    // three floats, not an orthonormal basis, so it is converted as a forward vector.
+    auto facing = read_vec3(*inner + off::kControlInner_Position + 12);
 
     PlayerSnapshot snap;
-    snap.position = math::add(*local, *origin);
     snap.local_position = *local;
-    snap.chunk_origin = *origin;
-    // Without a usable basis we keep the position and leave the rotation at the
-    // identity: the other player is then drawn unrotated rather than not drawn.
-    snap.rotation = basis_ok ? math::quat_from_axes(*ax, *ay, *az) : math::Quat{};
+
+    // The chunk origin is added by the game's own world-position global on this build:
+    // the inline value is already world space (Y is an elevation in the hundreds of
+    // metres, X and Z are map coordinates), so no origin is added here. kChunkOrigin is
+    // still suspect -- see offsets_3460.h -- and adding it would double-count.
+    snap.position = *local;
+    snap.chunk_origin = proto::Vec3{0.0f, 0.0f, 0.0f};
+
+    // No basis is available from this field, so the puppet is drawn unrotated rather
+    // than not drawn. That is the same fallback the previous code used when the basis
+    // failed its orthonormality check.
+    snap.rotation = math::Quat{};
+    (void)facing;
 
     // The game keeps its own world-space copy; a large mismatch means our
     // chunk-origin math or chain is off (it lags by a frame, so allow some).
+    //
+    // This is the self-check that caught the wrong globals on this build: it reported
+    // 46245.31 m, which is what sent the port back to re-measure. It compares two
+    // independent derivations, so it does not depend on any external tool agreeing with
+    // itself -- which is exactly why it is worth keeping even while it is noisy.
     if (auto global = read_vec3(base_ + off::kStaticPlayerPos)) {
         snap.static_pos_error = math::length(math::sub(snap.position, *global));
     }
