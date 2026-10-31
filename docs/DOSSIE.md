@@ -88,6 +88,49 @@ jogo está DEPOIS da injeção, dentro do processamento do jogo.**
 
 **É o jogo reagindo ao ator sintético.**
 
+### O lado do convidado — o que o vigia automático capturou
+
+A sessão foi gravada por um vigia que roda a cada 2 segundos, e o registro dele mostra o
+teste inteiro do ponto de vista do **convidado**:
+
+```
+18:16:04  ABRIU (sessao 1, pid 31796)
+18:16:04  [BUILD] D7FE9358
+18:16:21  [EXIT WATCH OK]
+18:16:31  [CONECTOU]
+18:17:27  [BONECO CRIADO]  Puppet: spawn queued at (-20608.7, 620.2, -6826.0) (2 packets, 16795 + 6453)
+18:17:31  [POSICAO OK - entrou no mundo]
+18:17:31  [VIU O OUTRO JOGADOR]  co-op: other player loaded        <- repetido 15x ate' 18:17:58
+18:18:00  *** FECHOU (sessao 1, durou 115s) ***
+```
+
+**Três fatos que só este registro estabelece:**
+
+1. **O convidado CONECTOU e ENTROU NO MUNDO** antes de o anfitrião morrer — `18:16:31`,
+   cerca de **56 segundos antes** do crash das 18:17:25.
+2. **O convidado VIU o boneco do anfitrião** — `other player loaded`, quinze leituras
+   consecutivas, **sem morrer**. A direção convidado←anfitrião **funciona**.
+3. **O convidado só fechou às 18:18:00**, ou seja **35 segundos depois** da morte do
+   anfitrião. Ele não caiu junto: ficou de pé até o anfitrião sumir da rede.
+
+**Portanto o crash é exclusivo da direção anfitrião←convidado.** Essa assimetria, agora
+confirmada por dois registros independentes, é o fato central do problema.
+
+### Os dumps que existem
+
+O mesmo vigia guardou **quatro dumps de crash**, e eles são dados primários que ainda não
+foram abertos:
+
+| Arquivo | Tamanho |
+|---|---|
+| `CrimsonDesert.exe.8712.dmp` | 297 MB |
+| `CrimsonDesert.exe.23212.dmp` | 296 MB |
+| `CrimsonDesert.exe.16884.dmp` | 227 MB |
+| `CrimsonDesert.exe.28324.dmp` | 228 MB |
+
+**Com o WinDbg instalado, `!analyze -v` em qualquer um deles dá módulo, offset e pilha.**
+Isto nunca foi feito.
+
 ---
 
 ## 3. A causa raiz, isolada com 23 ms de precisão
@@ -248,7 +291,72 @@ está enganchada, e sobrevive a **2000 throws seguidos**.
 
 ## 7. Por onde continuar — em ordem de valor
 
-### P1. Capturar os pacotes que matam o processo ⭐ **maior valor**
+### P1. O teto de 16 KB no `Suppress` é MENOR que um carregamento real ⭐ **comece aqui**
+
+**Descoberto ao reler o log do convidado depois do teste final ter sido arquivado.** Estava
+no log o tempo todo.
+
+O log do convidado repete, a cada 10 segundos:
+
+```
+Suppress: largest actor load 23082 bytes (ceiling 16384); 0 refused for size
+```
+
+**23082 > 16384.** O maior carregamento de ator observado **excede o teto em 41%**.
+
+#### O que o código diz
+
+`src/mod/net/native_suppress.cpp` carrega o próprio comentário:
+
+```cpp
+// UNVERIFIED ON 3446 -- the 16 KB ceiling comes from a 2976 measurement.
+```
+
+E `src/mod/net/enemy_relay.cpp`:
+
+```cpp
+constexpr size_t kMaxLoadSize = 16 * 1024;   // enemy loads are 6.6-11 KB
+```
+
+**O teto é uma medição da versão 2976**, nunca remedida, e **duas cópias** dela existem com
+a mesma citação. O valor 16384 vem de cargas de **inimigo** (6,6–11 KB) — não de
+**personagem de jogador**, que é outra coisa.
+
+#### Por que isso importa
+
+O log diz `0 refused for size` porque o `Suppress` está em **zone off**. Mas a **mesma
+constante** é usada em `enemy_relay.cpp`:
+
+```cpp
+if (!is_valid_enemy_copy_key(copy) || n < 0x40 || n > kMaxLoadSize || ...)
+```
+
+**Se um carregamento de 23082 bytes passar por esse caminho, ele é rejeitado** — e a
+rejeição é silenciosa do ponto de vista do jogo.
+
+#### A ligação com o crash
+
+Nos logs do anfitrião, os payloads injetados foram **16637 + 6445**. Com cabeçalhos, a soma
+passa de 23000 — **a mesma ordem de grandeza do carregamento de 23082 bytes** que o
+convidado registrou.
+
+**Hipótese:** o teto de 16 KB é pequeno demais para um personagem de jogador. O código trata
+um carregamento legítimo como suspeito.
+
+#### Como confirmar — é barato
+
+1. **`record=1` no `[sniffer]`** — conferir o tamanho **real** do `ActorLoadDataAck` de um
+   personagem de jogador.
+2. **Subir o teto** para um valor medido (ex.: 64 KB) **nos dois arquivos** e repetir.
+3. **Verificar qual caminho rejeita** — procurar no log do anfitrião por linhas de recusa
+   que não aparecem porque o log termina antes.
+
+**É uma correção de uma linha em dois arquivos, com um teste de 15 minutos.** A coisa mais
+barata e mais promissora da lista inteira.
+
+---
+
+### P2. Capturar os pacotes que matam o processo
 
 ```ini
 [sniffer]
@@ -260,7 +368,7 @@ jogo**. A diferença entre um pacote que o jogo aceita e um que o mata é a resp
 
 **Por que é viável agora:** sabemos o instante com **23 ms de precisão**.
 
-### P2. Ler o dump que já existe
+### P3. Ler os dumps que já existem
 
 ```
 %LOCALAPPDATA%\CrashDumps\CrimsonDesert.exe.<pid>.dmp
@@ -276,7 +384,7 @@ windbg -z <arquivo>.dmp
 O `!analyze -v` dá o módulo, o offset e a pilha. **Isso responde "onde" em minutos.** O que
 ele não dá é "por quê" — mas reduz muito o espaço de busca.
 
-### P3. Investigar a assimetria dos tamanhos ⭐ **nunca explicada**
+### P4. Investigar a assimetria dos tamanhos ⭐ **nunca explicada**
 
 | Sessão | user | body |
 |---|---|---|
@@ -288,17 +396,17 @@ ele não dá é "por quê" — mas reduz muito o espaço de busca.
 matou o anfitrião. Se o formato do pacote estiver errado, o tamanho deveria ser o sintoma
 mais visível.
 
-### P4. Testar a injeção em isolamento
+### P5. Testar a injeção em isolamento
 
 Injetar **só o pacote `user`**, depois **só o `body`**, e ver qual mata. Se nenhum matar
 sozinho, é a combinação.
 
-### P5. Verificar o guard de "posição estacionada"
+### P6. Verificar o guard de "posição estacionada"
 
 No log: `check vs game global 9008531862833856512.00 m`. **Esse número é lixo** — um valor
 que passa pela guarda. Confirmar qual global ele lê e se a comparação faz sentido.
 
-### P6. Recuperar os offsets da 3460
+### P7. Recuperar os offsets da 3460
 
 Método em `docs/PORTING.md`. Os avisos de startup listam exatamente o que falta.
 
