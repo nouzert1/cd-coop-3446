@@ -144,6 +144,17 @@ uint64_t g_drop_lines = 0;
 struct Counters {
     uint64_t dropped = 0, would_drop = 0, swept = 0, would_sweep = 0, deferred = 0, restored = 0, restore_failed = 0,
              server_removed = 0, lock_misses = 0;
+    // What the sniffer SAW, as opposed to what the zone then did with it. Every other counter
+    // here counts an action, so a session where no ActorLoadDataAck ever arrives prints all
+    // zeros -- and that is indistinguishable from a session where loads arrive and are all
+    // correctly ignored. Those need opposite investigations (is the sniffer hooked and is the
+    // world populated, versus is the predicate wrong), and after the round-44 lab run the log
+    // could not tell them apart: 376 lines, every counter zero, no way to say why.
+    //
+    // loads_seen counts every ActorLoadDataAck the sniffer handed over, before any filter.
+    // loads_person counts the type 3/6 ones, i.e. the only ones that could ever become a
+    // native. If loads_seen is 0 the sniffer is the suspect; if it is not, the predicate is.
+    uint64_t loads_seen = 0, loads_person = 0;
 } g_count;
 std::string g_hud;
 
@@ -858,6 +869,20 @@ void log_stats(uint64_t now) {
               "removed while held {} | dry run: would drop {}, would sweep {} | lock misses {}{}",
               g_zone.on() ? "on" : "off", held, c.dropped, c.swept, c.deferred, c.restored, c.restore_failed,
               c.server_removed, c.would_drop, c.would_sweep, c.lock_misses, g_broken ? " | breaker: off" : "");
+    // Said separately and only while there is nothing to show, so a healthy session does not
+    // grow a line it does not need. This is the answer to "why is every other counter zero":
+    // loads_seen 0 means the sniffer never handed us a load (watch the hooks and the world),
+    // loads_seen > 0 with all the action counters at 0 means the loads came and the predicate
+    // refused them all (watch the per-load verdict reasons).
+    if (g_zone.on() && c.loads_seen <= c.loads_person && c.swept == 0 && c.dropped == 0 && held == 0) {
+        log::info("Suppress: seen {} actor load(s) so far, {} of them a person (type 3/6). {}",
+                  c.loads_seen, c.loads_person,
+                  c.loads_seen == 0
+                      ? "The sniffer is hooked but has been given nothing: either this part of the "
+                        "world has no actors to stream in, or the hook is not seeing them."
+                      : "Loads are arriving, so the sniffer works; whatever is missing is in the "
+                        "predicate or the distance.");
+    }
 }
 
 void update_hud() {
@@ -967,8 +992,15 @@ void suppress_observe_s2c(const uint8_t* packet, size_t size) {
     const uint64_t now = now_ms();
     switch (op) {
         case kOpActorLoadDataAck: {
+            // Counted FIRST, before any filter at all. That is deliberate: the question this
+            // answers is "did the sniffer see loads", and a load rejected for having an owner or
+            // a non-world key still proves the sniffer is alive and the world is populated.
+            // Counting it after those checks would make the diagnostic lie in exactly the case
+            // it exists for.
+            ++g_count.loads_seen;
             const auto head = enemy_load::read_head({p, n});
             if (!head || head->owner != 0 || !keys::is_game_world_key(head->key)) return;
+            if (head->type == 3 || head->type == 6) ++g_count.loads_person;
             if (head->type == 7) {
                 // A weapon for a native that asked for one (each that comes
                 // within kArmingMs: a second weapon too).
