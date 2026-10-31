@@ -566,6 +566,30 @@ for name, rva, sig in guards:
        'matches again at the old rva! re-resolve it' if here else
        'occurrences of the pattern elsewhere: %d' % n)
 print()
+
+# The four containment sites. These MUST match: horse_diag_install hooks all four in one
+# `&&` chain and installs none if any fails, so a single stale address silently disables
+# the whole crash containment and the host dies on spawn with no log line explaining why.
+#
+# That is exactly what happened across this port and it cost a session to find, because
+# nothing checked these four between builds. They are now asserted here, offline, on
+# every run. When the game patches, this is the first thing that will fail -- and the
+# measurement to redo is a DIFF against a copy of the previous executable, not a byte
+# search: two of the four are MID-HOOKS, so the bytes recorded for them are interior
+# fragments of functions and will never be found by scanning for "the prologue".
+containment = [
+    ('kCcUpdate', 0x941D40,  bytes([0x48,0x89,0x5C,0x24,0x10,0x48,0x89,0x74,0x24,0x18,0x57,0x48,0x83,0xEC,0x20,0x48])),
+    ('kCcPost',   0x860D60,  bytes([0x0F,0x85,0xB6,0x00,0x00,0x00,0x4C,0x89,0x6C,0x24,0x28,0x80,0x7C,0x24,0x38,0x00])),
+    ('kRestore',  0x948240,  bytes([0x48,0x8B,0xC4,0x48,0x89,0x58,0x20,0x48,0x89,0x50,0x10,0x55,0x56,0x57,0x41,0x54])),
+    ('kPending',  0x232AF20, bytes([0x74,0x51,0x4C,0x89,0x3F,0x44,0x38,0x3E,0x74,0x32,0x48,0xC7,0xC3,0xFF,0xFF,0xFF])),
+]
+print('  (all four MUST match: one bad address disables the whole containment)')
+for name, rva, sig in containment:
+    off = doff(rva)
+    here = (d[off:off+len(sig)] == sig) if off else False
+    ok('containment site %s matches at exe+0x%X' % (name, rva), here,
+       'no match at that rva' if not here else '')
+print()
 print('RESULT: %s' % ('ALL OFFLINE CHECKS PASSED' if fails == 0 else '%d CHECK(S) FAILED' % fails))
 sys.exit(1 if fails else 0)
 '@

@@ -30,7 +30,7 @@ struct Site {
 // 3424 values read as garbage here (verified byte-for-byte against an independent read
 // of the same executable on the guest's PC).
 //
-// Measured so far:
+// Measured so far - ALL FOUR are now resolved:
 //
 //   kCcUpdate  exe+0x941D40 - three independent agreeing measurements:
 //      1. its body touches the component struct the way read_state() reads it:
@@ -51,34 +51,51 @@ struct Site {
 //         a patch is not something to rely on, but here it is corroboration rather than
 //         the basis: the behaviour above is what identifies the function.
 //
-// Still unresolved: kCcPost and kPending. Note the delta between kCcUpdate and kRestore
-// CHANGED between builds (0x4B30 on 3424, 0x6500 here), which is the second independent
-// reason a fixed delta cannot be used to port these - the first being the 0x35 spread
-// this port already measured across the globals.
-//   kCcPost    exe+0x860D60 - found by DIFFING the two builds, which is now possible
-//         because a copy of the 1.0.0.3424 executable survived on disk
-//         (CD-ref/_scan/CrimsonDesert.exe, PE timestamp 0x6AE387F2). Comparing the
-//         two showed the whole function barely moved: the 3424 body at exe+0x860C20
-//         and the 3446 body at exe+0x860C50 are the same code instruction for
-//         instruction, just shifted by 0x30, with branch displacements adjusted.
-//         The mid-hook point is +0x110 into that body in both builds, and its 16
-//         bytes are IDENTICAL (0F 85 B6 00 00 00 4C 89 6C 24 28 80 7C 24 38 00),
-//         which the per-site prologue check will verify at install time.
+// Note the delta between kCcUpdate and kRestore CHANGED between builds (0x4B30 on 3424,
+// 0x6500 here), which is one of several measured reasons a fixed delta cannot port these.
 //
-//         This also corrects a wrong assumption made earlier in the session: it was
-//         assumed kCcPost must read the layer chart (+0x110) because on_cc_post
-//         does. It does not. The mod reproduces that logic in C++; the game is not
-//         obliged to read the field the same way, and kCcUpdate - the very function
-//         this pass follows - never touches +0x110 at all. Searching for a chart
-//         read was searching for something that was never there.
+// The one method that DID work, and would have saved the whole session had it been tried
+// first: diff the two builds directly. A copy of the old executable was sitting on disk at
+// CD-ref/_scan/CrimsonDesert.exe (PE timestamp 0x6AE387F2, build 1.0.0.3424), so the
+// addresses never had to be guessed from byte patterns at all.
+//
+//   kCcPost    exe+0x860D60 - the 3424 site is a MID-HOOK, not a function entry: 0x860D30
+//         sits +0x110 into a body starting at 0x860C20. So the 16 "prologue" bytes
+//         recorded in Site were never a prologue - they are an interior fragment, which is
+//         why every attempt to find them elsewhere failed. 3424@0x860C20 and 3446@0x860C50
+//         are the same code instruction for instruction, shifted by exactly 0x30, with
+//         only branch displacements adjusted. The mid-hook is +0x110 into the body in both
+//         builds and its 16 bytes are IDENTICAL.
+//
+//         This also corrects a wrong assumption: kCcPost was assumed to read the layer
+//         chart (+0x110) because on_cc_post does. It does not. The mod reproduces that
+//         logic in C++; the game need not read the field the same way, and kCcUpdate -
+//         the function this pass follows - never touches +0x110 at all.
+//
+//   kPending   exe+0x232AF20 - also a mid-hook, into a body at exe+0x232AED0. Found
+//         through the two `lea` references that install it rather than by any byte
+//         pattern: on 3424 it is registered into a list at 0x163CEF8 and written to a
+//         vtable slot at 0xB194D53; the 3446 code at 0x163DAA8 has the identical
+//         surrounding structure (same [rbp+0x568] destination, same call, same two
+//         `mov byte ptr [rsp+...], 0` lines after it) and the `lea rdx` in front of it
+//         names the new address. The 30 instructions after the function entry match one
+//         for one; only the five branch displacements differ.
+//
+//         Worth knowing: this function does NOT touch the ClientCharacterControl struct -
+//         over 300 instructions it reads none of +0x80/+0x88/+0x90/+0xA8/+0x60. It is
+//         installed into a vtable rather than invoked as a CC method. The hook still
+//         reads ctx.rcx through read_key/read_state, so whether it observes what the
+//         comment above it claims is NOT established - both readers are guarded, so a
+//         wrong rcx fails safe, but it fails silently. Treat the PENDING log line as
+//         unverified until a live run shows it printing sensible state for a watched key.
 constexpr Site kCcUpdate = {0x941D40, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57, 0x48,
                                        0x83, 0xEC, 0x20, 0x48}, "CC update"};
 constexpr Site kCcPost = {0x860D60, {0x0F, 0x85, 0xB6, 0x00, 0x00, 0x00, 0x4C, 0x89, 0x6C, 0x24, 0x28, 0x80,
                                      0x7C, 0x24, 0x38, 0x00}, "CC post-update"};
 constexpr Site kRestore = {0x948240, {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x20, 0x48, 0x89, 0x50, 0x10, 0x55,
                                       0x56, 0x57, 0x41, 0x54}, "restore actions"};
-constexpr Site kPending = {0x2329D70, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89,
-                                       0x74, 0x24, 0x20, 0x57}, "pending actions"};
+constexpr Site kPending = {0x232AF20, {0x74, 0x51, 0x4C, 0x89, 0x3F, 0x44, 0x38, 0x3E, 0x74, 0x32, 0x48, 0xC7,
+                                       0xC3, 0xFF, 0xFF, 0xFF}, "pending actions"};
 
 SafetyHookMid g_cc_hook, g_post_hook, g_restore_hook, g_pending_hook;
 uint8_t* g_ret = nullptr;
