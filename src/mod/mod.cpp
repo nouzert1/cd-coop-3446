@@ -174,11 +174,20 @@ public:
         if (!in_game_) return "synthetic";
         if (!last_) return "unavailable (" + status_ + ")";
         const auto& p = *last_;
+        // The self-check prints "not measured" rather than a number when it has nothing to
+        // compare against. This matters more than it looks: kStaticPlayerPos is WRONG on
+        // 3460 (it holds pointers), so the check silently abstains -- and an abstention
+        // rendered as "check vs game global 0.00 m" reads as a perfect verification of a
+        // chain that was never verified. A zero that means "no data" and a zero that means
+        // "perfect agreement" must not print the same way.
+        const std::string check = p.static_pos_error >= 0.0f
+            ? std::format("check vs game global {:.2f} m", p.static_pos_error)
+            : std::string("check vs game global n/a");
         return std::format("pos ({:.2f}, {:.2f}, {:.2f}) rot ({:.3f}, {:.3f}, {:.3f}, {:.3f}) "
-                           "hp {:.1f}/{:.1f} stamina {:.1f}/{:.1f} | check vs game global {:.2f} m",
+                           "hp {:.1f}/{:.1f} stamina {:.1f}/{:.1f} | {}",
                            p.position.x, p.position.y, p.position.z, p.rotation.x, p.rotation.y,
                            p.rotation.z, p.rotation.w, p.health, p.health_max, p.stamina,
-                           p.stamina_max, p.static_pos_error);
+                           p.stamina_max, check);
     }
 
 private:

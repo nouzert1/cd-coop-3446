@@ -21,7 +21,14 @@ struct PlayerSnapshot {
     float health_max = 0.0f;
     float stamina = 0.0f;
     float stamina_max = 0.0f;
-    float static_pos_error = 0;  // distance to the game's own world-pos global
+    // Distance from `position` to the game's own world-position global -- the self-check
+    // that compares two independent derivations. NEGATIVE MEANS NOT MEASURED, and that
+    // distinction is load-bearing: kStaticPlayerPos is wrong on 3460 (it holds pointers),
+    // so this check abstains on every sample. With a default of 0 the log printed
+    // "check vs game global 0.00 m", which reads as perfect agreement and is the opposite
+    // of what happened. A zero meaning "no data" must not look like a zero meaning
+    // "verified".
+    float static_pos_error = -1.0f;
 };
 
 class PlayerReader {
