@@ -45,10 +45,96 @@
 namespace cdmp::game::build_3446 {
 
 using build_3424::RelayedAck;
-using build_3424::kActionLayerAdvance;
-using build_3424::kActionLayerAdvanceHead;
-using build_3424::kActionLayersAdvance;
-using build_3424::kActionLayersAdvanceHead;
+// ---- kActionLayerAdvance: MEASURED. kActionLayersAdvance: head was ALWAYS wrong --
+//
+// MEASURED LIVE 2026-10-30 (single-PC echo, game running, world loaded):
+//
+//     WRN Puppet: PointClimb::Enter not recognised; wall climbs will freeze
+//     WRN Enemy copies disabled: their crash guards could not be installed
+//
+// puppet_install_layer_guards() (remote_puppet.cpp:2489) requires BOTH heads to match.
+// They did not, so mod.cpp:771 switched enemy copies OFF -- which is why a whole session
+// with the echo peer produced no EnemyRelay line, no WOULD COPY and no copy of any kind.
+// The enemy relay has not been running, and the only sign was one WRN easy to read past.
+//
+// kActionLayerAdvance, 3424 0x1F63F70 -> 3446 0x2148D50, found by signature and CONFIRMED
+// by the body rather than by the bytes matching: 3446@0x2148D50 opens with
+// `push rdi / sub rsp,0x80 / vmovaps [rax-0x28],xmm7 / vxorps xmm7,xmm7,xmm7 /
+// vcomiss xmm7,xmm3 / mov rdi,rcx` -- float parameters, float comparisons, rcx as `this`.
+// That is an advance driven by a delta. Confirmation by behaviour, not by a hit.
+//
+// THE HEAD WAS ALREADY RIGHT; THE ADDRESS WAS WRONG. Measured at 3446@0x2148D50:
+//   48 8B C4 57 48 81 EC 80 00 00 00 C5 F8 29 78 D8
+// which is kActionLayerAdvanceHead below, byte for byte. On 3424 the same head does NOT
+// appear at 0x1F63F70 (that reads 18 B9 02 EB 05 ...), so on 3424 the head was wrong there
+// -- but on 3446 the head identifies the function correctly and only the address had been
+// left pointing at the 3424 value. Keeping this head is what makes the guard meaningful.
+inline constexpr uintptr_t kActionLayerAdvance = 0x2148D50;
+inline constexpr uint8_t kActionLayerAdvanceHead[] = {0x48, 0x8B, 0xC4, 0x57, 0x48, 0x81, 0xEC, 0x80,
+                                                      0x00, 0x00, 0x00, 0xC5, 0xF8, 0x29, 0x78, 0xD8};
+
+// THE HEAD RECORDED HERE WAS WRONG IN *BOTH* BUILDS. Measured, not inferred:
+//
+//   0x1F63F70 (3424) reads  18 B9 02 EB 05 E8 86 17 B9 02 ...   not the head below
+//   0x2329700 (3424) reads  74 51 4C 89 3F 44 38 3E 74 32 ...   not the head below
+//   and the kActionLayersAdvance head bytes do not occur ANYWHERE in the 3424 image
+//   (scan: 0 matches), so it never described any function in that build either.
+//
+// A guard whose head is authored from the same wrong address as its target agrees with
+// itself and passes for as long as nobody re-measures. That is exactly what happened to
+// kServerOtherEquipWriter in round 20 -- the head had been written from the wrong address,
+// so the check confirmed the error instead of catching it. This is the second instance.
+//
+// The consequence here is not a crash, it is a SILENTLY DEAD FEATURE: the relay never
+// armed, and every session that was supposed to exercise enemy copies exercised nothing.
+//
+// Both stay 0. 0 makes puppet_install_layer_guards() return false, which keeps enemy copies
+// off -- bad, but honest and fail-closed. A guessed address would install a mid-hook over
+// unrelated code, and the failure would then be a crash rather than a disabled feature.
+//
+// TO FINISH: the family is identified and the pattern is proven on both builds. These are
+// the action-layer advance functions, laid out as a run of near-identical functions with an
+// internal entry at +0x50:
+//
+//   3424: 0x2329040  0x2329380  0x23296B0  0x23299F0  0x2329D20   (step 0x340/0x330)
+//   3446: 0x232A530  0x232A860  0x232ABA0  0x232AED0              (step 0x330/0x340)
+//
+// and the two mothers are byte-for-byte identical between builds, which is what fixes the
+// correspondence rather than the spacing alone:
+//
+//   3424 0x2329D20 == 3446 0x232AED0   (the kPending mother; kPending is at +0x50 in both)
+//   3424 0x23296B0 == 3446 0x232ABA0   (mov [rsp+0x10],rdx / push rbp,rsi,rdi,r14,r15 /
+//                                       lea rbp,[rsp-0x50] / sub rsp,0x150 / mov rdi,rdx /
+//                                       mov rbx,rcx / xor r15d,r15d -- identical)
+//
+// so 0x232ABA0 is very likely the kActionLayersAdvance mother on 3446 -- but 0x232ABA0 has
+// now been disassembled and it is THE SAME STRING HELPER as 0x2329700 on 3424:
+//
+//   mov rbx,-1 / inc rbx / cmp [rsi+rbx],r15b / jnz   <- a strlen loop
+//   mov ecx,ebx / call 0x15FF440 / lea edx,[rbx+1] / call [0x558B4B8]
+//
+// so the mother's identity was a coincidence of layout, not the function either. The whole
+// family at 0x232A530..0x232AED0 on 3446 (0x231C470.. on 3424) is string handling, and
+// 0x2329D20/0x232AED0 -- the one the mod calls kPending -- is in the same run. That casts
+// doubt on kPending too, which the port notes already call its weakest link: "over 300
+// instructions the function does NOT touch ClientCharacterControl". This measurement is
+// consistent with kPending being wrong as well.
+//
+// It is NOT set here and it is NOT guessed. Five times this port recorded an address from a
+// match it did not confirm -- kCcPost, kPending, kMinimapIconDecide, kServerOtherEquipWriter
+// (one byte early, head written from the same wrong address), kVtWallUpMovementMethod (never
+// that vtable). Each cost a round. The confirmation available here is what the bytes DO, and
+// what they do is string handling, which is not an action-layer advance.
+//
+// The real site is still unknown. What is now known and was not before: the heads in this
+// file describe no function in either build, so the guard could never have passed -- the
+// enemy relay has been dead this whole time, silently, and that is a bigger finding than the
+// address itself.
+inline constexpr uintptr_t kActionLayersAdvance = 0;
+
+// Left as-is for the record; it matches no build (see above). Do not use to accept a site.
+inline constexpr uint8_t kActionLayersAdvanceHead[] = {0x48, 0x8B, 0xC4, 0x41, 0x54, 0x41, 0x56, 0x48,
+                                                       0x83, 0xEC, 0x68, 0xC5, 0xF8, 0x29, 0x70, 0xC8};
 using build_3424::kActorManager_ControlledActor;
 using build_3424::kActor_ComponentTable;
 using build_3424::kActor_Key;

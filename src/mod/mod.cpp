@@ -768,7 +768,19 @@ DWORD WINAPI late_init(LPVOID param) {
             net::puppet_set_horse_enabled(false);
             log::warn("Horse and enemy copies disabled: their crash containment could not be installed");
         } else if (!guarded) {
+            // This one line is the whole visible trace of the enemy relay being dead. It was
+            // printed once at boot, between dozens of status lines, and it went unnoticed for
+            // a long time -- a full echo session with a copy in the world produced no relay
+            // activity at all and nobody connected the two, because a feature that fails
+            // safely and silently looks exactly like a feature that works.
+            //
+            // So it now says what it costs, and it does not leave the reader to infer that
+            // enemy copies, shared loot and joint boss damage are ALL off as a result.
             log::warn("Enemy copies disabled: their crash guards could not be installed");
+            log::warn("  -> the enemy relay is OFF for this whole session: no copies of the other");
+            log::warn("     player's enemies, so no shared loot and no guest hits on them either.");
+            log::warn("     Everything else (your own copy, movement, equipment, horses) still works.");
+            log::warn("     Usually an offset for this game build; see docs/RELEVO-INIMIGOS-NUNCA-LIGOU.md");
         }
         net::enemy_set_receive_enabled(guarded);
         // Sending OUR enemies (Ctrl+F6 / Ctrl+F7): the host only.
