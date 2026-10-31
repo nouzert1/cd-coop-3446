@@ -580,6 +580,22 @@ if ($install_text -match '\{\{') { throw 'INSTALL.md still has an unstamped plac
 if ($install_text -notmatch [regex]::Escape($asi_hash)) { throw 'INSTALL.md did not get the hash' }
 $install_text | Set-Content -Path (Join-Path $kit 'INSTALL.md') -Encoding UTF8
 
+# The research task for the guest's agent.
+#
+# The host crashes 0.4 s after the other player's character is injected, and the fix is a
+# reverse-engineering job on the guest's copy of the game -- which is the one machine we
+# cannot measure from here. INVESTIGATION.md carries the exact crash transcript, the lead
+# (crash containment failed to install on 3446), four candidate causes with the cheapest
+# experiment first, the tool invocation for each, and the three traps that cost real time
+# in this port. Copied, not generated: it is mostly prose and its job is to be read and
+# argued with, so it belongs in a file that diffs cleanly.
+$investigation_src = Join-Path $root 'kit\coop\INVESTIGATION.md'
+if (-not (Test-Path $investigation_src)) { throw "Missing $investigation_src" }
+$investigation_text = Get-Content $investigation_src -Raw -Encoding UTF8
+$investigation_text = $investigation_text.Replace('{{BUILD_ID}}', $build_id_upper).Replace('{{ASI_SHA256}}', $asi_hash)
+if ($investigation_text -match '\{\{') { throw 'INVESTIGATION.md still has an unstamped placeholder' }
+$investigation_text | Set-Content -Path (Join-Path $kit 'INVESTIGATION.md') -Encoding UTF8
+
 $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
     $h = (Get-FileHash (Join-Path $kit $f) -Algorithm SHA256).Hash
     '{0}  {1}' -f $h, $f
