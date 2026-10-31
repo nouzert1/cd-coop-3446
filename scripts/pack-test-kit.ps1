@@ -618,7 +618,7 @@ $investigation_text | Set-Content -Path (Join-Path $kit 'INVESTIGATION.md') -Enc
 # machine, so it walks the MINIDUMP structures directly.
 $diag = Join-Path $kit 'diagnostico'
 New-Item -ItemType Directory -Force -Path $diag | Out-Null
-foreach ($s in 'capture-hang.ps1', 'dump-threads.ps1', 'check-fieldtime.ps1') {
+foreach ($s in 'capture-hang.ps1', 'dump-threads.ps1', 'check-fieldtime.ps1', 'instalar-host.ps1') {
     $src = Join-Path $root "scripts\$s"
     if (-not (Test-Path $src)) { throw "Missing $src" }
     Copy-Item $src $diag -Force
