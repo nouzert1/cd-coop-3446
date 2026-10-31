@@ -201,17 +201,23 @@ inline constexpr uintptr_t kTrocInstancesEnd = 0x6EBA378;    // 3446:0x6EB6378
 //
 // WHAT WENT WRONG IN MEASURING THEM. Reading these globals through
 // `cdmp_probe --pid` gave results that contradicted each other in the same session,
-// on the same live process:
-//   * `chain 0x1471B1A40` reported that the target was a GlobalVariableManager
-//     object; `read` at that same object address returned unrelated bytes;
-//   * `scan --heap` returned zero hits for a vtable that had already been observed
-//     live in that process;
-//   * two different globals, 0x71B1A40 and 0x719DCA0, both resolved to the same
-//     object pointer -- which cannot be true of two distinct globals.
-// No conclusion about data addresses survived that, and the tempting one -- "the
-// .data section did not move, so these are still right" -- was reached and then
-// discarded for exactly this reason. An instrument that disagrees with itself cannot
-// confirm anything, including a hypothesis it appears to support.
+// on the same live process, and for a while that was written down here as the
+// instrument disagreeing with itself. That was WRONG and is corrected: the tool is
+// fine, the calls were mine. `scan --heap` was later used successfully to find the
+// live ClientActorManager (one instance, expected vtable), which settles it.
+//
+// The real finding is narrower and worse. The address in use, 0x71B1A40, holds a
+// pointer to an object whose vtable is GlobalVariableManager -- NOT the WorldSystem.
+// Measured live, the log repeats `WorldSystem not created` with the character loaded
+// and walking. And GlobalVariableManager itself moved by +0x5680 between the builds,
+// a fifth distinct delta alongside +0x4000, +0x4010, +0x4018 and +0x990 measured in
+// this same port.
+//
+// The likely cause is not a shift but a REORDER: the game appears to have rearranged
+// its system objects in .data, and GlobalVariableManager now sits where the
+// WorldSystem used to. Five different deltas in one patch is the real lesson: a delta
+// is not a measuring instrument in this binary. Any single one of them, applied to
+// the whole table, would have fixed part of it and silently broken the rest.
 //
 // HOW TO SETTLE THEM. Through the mod, not the probe. PlayerReader computes
 // `static_pos_error` -- the distance between the position derived from the chain and
