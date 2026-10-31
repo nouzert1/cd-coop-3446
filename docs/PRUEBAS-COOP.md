@@ -42,19 +42,37 @@ you, with about 0.4 s of delay.
 With `cdmp_peer` this PC is host and guest at the same time, so you can only check **what**
 the guest would hide and **what** the host would copy: the mod forces the dry run
 (`docs/research/fase5-suprimir-enemigos-invitado.md` §6.2, tests L0 and L0b).
-1. In `bin64\cdmp.ini`: `[coop] suppress=dry` (or without the key: it is the default),
-   `enemy_auto=1` and `[dev] enemy_relay=1`. `role=guest` with `transport=udp`, as always.
+
+**CORRECTION (2026-10-30): the host half of this test CANNOT run with the peer.** It used to
+promise the `WOULD copy N of M` line below; that line is unreachable on one PC, and this is
+not a defect. `auto_tick()` (`enemy_relay.cpp:1030`) returns early unless `g_partner_zone` is
+on, and `g_partner_zone` is only ever set by `enemy_on_zone_request` -- the `EnemyZoneMsg`
+that the GUEST sends, describing where the guest is in THEIR world. `cdmp_peer` has three
+modes (relay, ghost, bot) and all three merely echo, so no zone ever arrives. See
+`RELEVO-INIMIGOS-NUNCA-LIGOU.md`, section "LIMITE DO TESTE DE ECO".
+
+So on one PC you can verify **L0 only** (the guest's half: `Suppress: WOULD DROP` /
+`WOULD SWEEP`). The host's half -- L0b and everything in section E of `PRUEBA-DOS-PC.md` --
+needs a second player. If you run this and never see `WOULD copy`, nothing is wrong.
+
+Also: `[dev] enemy_relay=1` is **no longer needed and never was the real switch**. That key
+was the workaround for a bug, fixed on 2026-10-30, where the relay thread tested the dev
+switch instead of the user's; `[coop] enemy_auto` is the only switch and it defaults to on.
+Setting the dev key now would only hide that bug again.
+
+1. In `bin64\cdmp.ini`: `[coop] suppress=dry` (or without the key: it is the default) and
+   `enemy_auto=1`. `role=guest` with `transport=udp`, as always.
 2. `cdmp_peer.exe --mode relay --delay 50 --offset 0`, open the game and load the save.
 3. When your copy appears, after 2 s: `Suppress: zone ON (host 0 m away, N natives to hide) - DRY RUN`
-   (0-3 m: your copy) and `Enemy relay: the guest's enemy zone ON (request 1, 150 m, dry run): only
-   logging what we would copy`. In the panel (F8): "Zone 150 m (test): your enemies stay".
+   (0-3 m: your copy). The host half of this line pair does NOT appear on one PC; that is
+   expected. In the panel (F8): "Zone 150 m (test): your enemies stay".
 4. Go to the Bleed Bandits camp near (−10.284, 640, −3.383).
 
 | # | What to do | What you should see in `cdmp.log` |
 |---|---|---|
 | L0 | Approach the camp | `Suppress: WOULD SWEEP group 0x… (N natives, "Bleed Bandit", … m from the host)` once within 150 m, and some `WOULD DROP load 0x… "Bleed Bandit" faction 1000016 … origin S` (few: almost everything loads at about 200 m). **Only bandits**: no guards, animals, civilians, riders or mercenaries |
 | L0 | Go to a city | No `WOULD DROP` or `WOULD SWEEP` |
-| L0b | Stay next to the camp | `Enemy relay: zone (the guest's dry run) WOULD copy N of M zone enemies within 150 m: …` with the same enemies as the guest's `WOULD SWEEP` (which counts by groups: leader and members) |
+| L0b | **Two PCs only** — see `PRUEBA-DOS-PC.md` E0 | `Enemy relay: zone (the guest's dry run) WOULD copy N of M zone enemies within 150 m: …` with the same enemies as the guest's `WOULD SWEEP` (which counts by groups: leader and members). **Not reachable with `cdmp_peer`: no zone arrives, so `auto_tick` returns early and this line is never printed.** Moved to the two-PC document |
 | — | Every 10 s | `Suppress: zone on`, `held 0` and `dry run: would drop N, would sweep N` (held always 0: nothing changes in the game) |
 
 **Lab (optional, writes into the game: back up the saves and do not save).** Without `cdmp_peer`:

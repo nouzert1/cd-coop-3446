@@ -803,6 +803,24 @@ DWORD WINAPI late_init(LPVOID param) {
         // the player stood 200 m from Bleed Bandits camp with good link stats, and not one
         // `Enemy relay:` line appeared in the whole session. Fixed by asking the same two
         // switches run_network asks, so the thread, g_auto and the log all agree.
+        //
+        // WHY THIS IS NOT gated on role=host, even though docs/research/pendiente-robustez.md:429
+        // prescribes exactly that (`pasar a [coop] enemies=auto, solo con role=host`).
+        //
+        // The relay is symmetric and decides per message, not per role: whoever RECEIVES an
+        // EnemyZoneMsg copies, whoever needs enemies sends one. coop.cpp:356 states it --
+        // "the guest's request (host) or the host's answer (guest)". A host-only gate here
+        // would silence the guest's own Ctrl+F6/Ctrl+F7 and, more importantly, would stop the
+        // guest from ever answering, which is how the zone handshake completes.
+        //
+        // Gating on role would ALSO not have caught the real bug: in the echo profile the
+        // single process plays both roles, so a role check is true for one of them whatever
+        // you write, and the thread still would not have started for a normal user.
+        //
+        // The concern behind line 429 was real -- a guest that copies its own enemies sends
+        // them to the host -- but the guard for it is already in the data path, not here:
+        // auto_tick() returns early unless g_partner_zone is on, and that only turns on from a
+        // message the OTHER side sent. With no link there is nothing to copy.
         const bool relay_wanted = init->relay_wanted;
         if (relay_wanted && guarded) {
             CloseHandle(CreateThread(
