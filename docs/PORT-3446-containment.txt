@@ -159,9 +159,33 @@ kCcUpdate is 311 bytes and ends at a `ret` that is NOT the end of its logical bo
 `jnz` target exe+0x941DB6, PAST the ret, and that region jumps back to exe+0x941DA4. The
 compiler split the function in two. So kCcPost may not be "the next function along" at
 all - it may be a point INSIDE a larger body, which is exactly what a mid-hook expects,
-and would explain why searching for the next prologue keeps failing. This is the thread
-worth pulling next: disassembling the region the jnz targets and looking for a point where
-the component is in the post-update state.
+and would explain why searching for the next prologue keeps failing.
+
+Two more approaches tried and failed since, bringing the list to ten:
+
+  9. Searching for the layer walker by its chart read. The 3424 crash report says
+     0x2329700 advances the two layers and is identified by checking layer+0x110 != 0,
+     dt > 0 and rate > 0 while NOT checking +0x18. Scanning for `cmp qword ptr
+     [reg+0x110], 0` gives two hits in the 0x2xxxxxx range (exe+0x20EEC86,
+     exe+0x216E299); the nearest function start is exe+0x216D0A0, a very large body
+     (past 0x216FF6A) whose calls resolve to instrumented allocator helpers
+     (exe+0x4AF7A0C, exe+0x4AF790C, exe+0x4AF70C8) and TLS guards. It contains exactly
+     ONE chart test, so it is a much larger routine that happens to touch the field, not
+     a layer walker. False positive.
+
+ 10. Fixed distance 0x1190 from kCcUpdate (the 3424 gap to kCcPost): exe+0x942ED0 is
+     unrelated code. This is the third independent confirmation that a fixed delta is
+     unusable - alongside the 0x35 spread across the globals and the 0x4B30 -> 0x6500
+     change measured directly between kCcUpdate and kRestore.
+
+Why the chart-read route keeps failing, and what it implies: scanning the WHOLE CC code
+region (0x94xxxx) for any load of [reg+0x110] returns exactly ONE hit, exe+0x947DD9, and
+that one belongs to the instrumented function above rather than to a CC method. If
+kCcPost genuinely read the chart the way on_cc_post does, a load of +0x110 should appear
+in the CC region. It does not. That is weak evidence that kCcPost is NOT in the CC code
+region at all - the same conclusion kPending already forced, since 0x2329D70 on 3424 sits
+in a different region from every other site. Both may belong to the caller that drives
+the component, which is the actor-update side of the chain, not the component itself.
 
 
 WHAT THIS DOES AND DOES NOT BUY
