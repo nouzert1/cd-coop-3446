@@ -223,11 +223,25 @@ inline constexpr uintptr_t kVtClientActorManager = 0x5939CD8;  // 3424:0x5937C48
 inline constexpr uintptr_t kVtControlledActor = 0x5907C90;     // 3424:0x5905BE0
 inline constexpr uintptr_t kVtCharacterControl = 0x59388D0;    // 3424:0x5936838
 inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
-// These three have no RTTI class of that name in this image at all
-// (`probe vtables` answers "Type name not found"), so they cannot be re-resolved
-// and keep their previous values. PhysicsObject and Camera were already 0 on 3424,
-// which reads as "no check", so there is nothing to resolve and nothing is lost.
-//   kVtPhysicsObject, kVtCamera                  -> 0 (unchanged, no check)
+// ---- kVtPhysicsObject and kVtCamera stay 0, deliberately -------------------
+// These are NOT unresolved pending work, and the earlier note here got the reason
+// wrong. There is nothing to find: both are 0 on 3424 as well, and 0 is a value the
+// consumers are written to respect --
+//
+//   player_reader.cpp:83    if (off::kVtPhysicsObject != 0 && !has_vtable(...))
+//   camera_reader.cpp:66    if (off::kVtCamera != 0 && !has_vtable(...))
+//
+// -- so 0 means "identity check not available" and each reader falls through to the
+// check that is actually load-bearing: for physics, the orthonormal basis and the
+// cross-check against the static position; for the camera, a float sentinel at +0xAC0
+// of the camera block. Setting a guessed address here would be strictly worse than 0,
+// because a wrong vtable turns a working reader into one that refuses.
+//
+// The reason they are 0 is the honest one: `PhysicsObject` is not a class name in this
+// image at all, and `Camera` matches unrelated types (hkxCamera, CameraComponent,
+// ClientFrameEventCameraShake...) with no way to tell which one the field holds. That
+// is a search that cannot converge, not a search that has not been run.
+//   kVtPhysicsObject, kVtCamera                  -> 0 (no check, by design)
 //
 // ---- kVtWallUpMovementMethod: the old value was never this vtable ----------
 // MEASURED on 3446, and it turned out the 3424 value was not merely stale.
