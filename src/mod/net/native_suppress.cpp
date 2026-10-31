@@ -56,7 +56,24 @@ constexpr uint16_t kOpOnDemandEquipDockingGimmickSpawnReq = 2249;
 constexpr uint8_t kReasonFar = 25;          // the server's own "far away"
 constexpr uint8_t kReasonLoadScreen = 19;   // everything goes
 constexpr uint8_t kReasonWeaponGone = 45;   // an NPC's weapon gimmick, after the NPC
-constexpr size_t kMaxLoad = 16 * 1024;      // NPC loads are 6.6-11 KB
+// UNVERIFIED ON 3446 -- the 16 KB ceiling comes from a 2976 measurement.
+//
+// The comment used to read "NPC loads are 6.6-11 KB" and stop there, which hides where that
+// came from: docs/research/enemigos-del-anfitrion.md, whose own header says the numbers are for
+// build 1.0.0.2976 and "solo valen para esta build". The same 16 KB appears again in
+// enemy_relay.cpp as kMaxLoadSize, with the same citation -- two copies of one unremeasured
+// assumption, and NOTHING logs when either one discards a load.
+//
+// It matters because the failure is silent and looks like an empty world. During the round-44
+// lab run the player took damage (HP fell 1125 -> 787) while the zone reported "0 natives to
+// hide" for the whole session: an enemy was close enough to hit them, so a load must have
+// arrived, and if its record grew past 16 KB between the builds it was dropped here without a
+// word. That is a hypothesis, not a finding -- no capture of a 3446 load has been measured yet.
+//
+// To settle it: run with [sniffer] record=1, walk into a camp, and read the record sizes out of
+// cdmp_packets_*.log. If any type 3 record exceeds 16384 the ceiling is wrong and both copies
+// have to move. Until then this number is a guess that has never failed loudly.
+constexpr size_t kMaxLoad = 16 * 1024;      // NPC loads were 6.6-11 KB on 2976
 constexpr size_t kMaxHeld = 512;            // ~4 MB of loads at most
 constexpr size_t kMaxNatives = 512;
 constexpr size_t kMaxSmallSet = 1024;
@@ -155,6 +172,11 @@ struct Counters {
     // loads_person counts the type 3/6 ones, i.e. the only ones that could ever become a
     // native. If loads_seen is 0 the sniffer is the suspect; if it is not, the predicate is.
     uint64_t loads_seen = 0, loads_person = 0;
+    // The largest record seen, and the largest that was REFUSED for being over kMaxLoad. The
+    // ceiling is a 2976 measurement (see its note); these two numbers are what says whether it
+    // still fits, without needing a packet capture. biggest_refused > 0 means real records are
+    // being dropped for size, and biggest_seen next to kMaxLoad says how much headroom is left.
+    size_t biggest_seen = 0, biggest_refused = 0;
 } g_count;
 std::string g_hud;
 
@@ -883,6 +905,17 @@ void log_stats(uint64_t now) {
                       : "Loads are arriving, so the sniffer works; whatever is missing is in the "
                         "predicate or the distance.");
     }
+    // Printed whenever any load at all has been seen, because the ceiling it reports against is
+    // a 2976 value that has never been re-measured on 3446. This turns "is kMaxLoad still
+    // right?" into a number in the log instead of a question that needs a packet capture.
+    if (c.loads_seen > 0) {
+        log::info("Suppress: largest actor load {} bytes (ceiling {}); {} refused for size{}",
+                  c.biggest_seen, kMaxLoad, c.biggest_refused,
+                  c.biggest_refused > 0
+                      ? " -- THE CEILING IS TOO LOW: real 3446 records exceed it and are being "
+                        "dropped silently. enemy_relay.cpp's kMaxLoadSize needs the same fix."
+                      : "");
+    }
 }
 
 void update_hud() {
@@ -957,7 +990,19 @@ bool suppress_filter_s2c(const uint8_t* packet, uint16_t size) {
     const bool held = g_held_count.load(std::memory_order_relaxed) > 0;
     if (!g_dropping.load(std::memory_order_relaxed) && !held) return false;
     const size_t n = size - 5u;
-    if (n < 0x40 || n > kMaxLoad || !guarded_copy(head + 5, packet + 5, 11)) return false;
+    // An over-sized load is refused here, and this is the only place that says so. See the note
+    // on kMaxLoad: the ceiling is a 2976 measurement, and if a 3446 record is bigger this line
+    // is what silently turns a camp into an empty field. Warned rather than logged as info
+    // because a load this big is either the ceiling being wrong (a defect) or a record type this
+    // code was never meant to see (also worth knowing).
+    if (n > kMaxLoad) {
+        g_count.biggest_refused = std::max(g_count.biggest_refused, n);
+        log::warn("Suppress: refusing an ActorLoadDataAck of {} bytes (ceiling {}): if this is a "
+                  "normal enemy, kMaxLoad is a 2976 value that no longer fits 3446",
+                  n, kMaxLoad);
+        return false;
+    }
+    if (n < 0x40 || !guarded_copy(head + 5, packet + 5, 11)) return false;
     // u16 len | u8 type | u32 key | u32 owner: one NPC record of the game's world.
     uint16_t len;
     std::memcpy(&len, head + 5, 2);
@@ -998,6 +1043,7 @@ void suppress_observe_s2c(const uint8_t* packet, size_t size) {
             // Counting it after those checks would make the diagnostic lie in exactly the case
             // it exists for.
             ++g_count.loads_seen;
+            g_count.biggest_seen = std::max(g_count.biggest_seen, n);
             const auto head = enemy_load::read_head({p, n});
             if (!head || head->owner != 0 || !keys::is_game_world_key(head->key)) return;
             if (head->type == 3 || head->type == 6) ++g_count.loads_person;
