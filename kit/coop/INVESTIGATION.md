@@ -35,7 +35,7 @@ Additional rules, each one from a crash that already happened:
 
 ## 1. The symptom, exactly
 
-Game build **1.0.0.3446**. Both players on mod build `5C4F0725`, verified identical by
+Game build **1.0.0.3446**. Both players on mod build `{{BUILD_ID}}`, verified identical by
 hash, so this is **not** a version mismatch.
 
 The guest joins. Position exchange works. Then, the instant the guest's character is
