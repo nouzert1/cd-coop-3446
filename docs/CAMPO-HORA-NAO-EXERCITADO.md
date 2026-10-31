@@ -20,6 +20,27 @@ O mundo estava carregado de verdade. Controles lidos no mesmo processo e no mesm
 | HP do jogador (log do mod) | `1125.0/1125.0` | ator vivo e legível |
 | `check vs game global` | `0.05 m` | a leitura do mod bate com a do jogo |
 
+### E a leitura de posição foi confirmada de novo, sobre movimento real
+
+A tabela acima tem uma amostra. Numa sessão posterior (2026-10-31, pid 12328) o mod foi
+acompanhado por **596 m de caminhada contínua**, 15 amostras de `check vs game global`:
+
+| medida | valor |
+|---|---|
+| mínimo | 0.04 m |
+| máximo | 0.47 m |
+| média | **0.084 m** |
+| acima de 1 m | **0 de 15** |
+
+Percorrer 596 m sem o erro crescer é o que torna isto uma confirmação e não uma coincidência:
+um endereço errado que por acaso aponta para coordenadas parecidas **não acompanha o jogador**,
+e o erro de um ponteiro desalinhado cresce com a distância percorrida em vez de ficar em
+centímetros. `kStaticPlayerPos` segue o movimento e o erro fica constante, então a correção
+(commit `270e2cc`) está verificada em uso, não só "lida uma vez".
+
+Vale para `kStaticPlayerPos` e para o que depende dele. **Não** vale para `kFieldTimeClient`:
+o bloco continua zerado e nada o lê (ver abaixo).
+
 E o bloco em `0x6EB2AD8`: **32 bytes zerados**.
 
 ## Por que zero ali **não prova nada**

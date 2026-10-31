@@ -466,6 +466,37 @@ size_t natives_in_zone() {
     return n;
 }
 
+// Why the count above is what it is. "0 natives to hide" is true and useless on its own: it
+// reads the same whether the player is standing in an empty field, standing in a camp whose
+// enemies were all filtered out, or standing in a camp the mod has simply never seen a load
+// for. Those need different fixes and the player cannot tell them apart from the log.
+//
+// The three numbers that separate them: how many loads the mod has tracked at all (tracked),
+// how many of those passed the verdict (yes), and how many are within the radius (inside). A
+// camp right in front of the player with tracked=0 means the loads never reached the sniffer;
+// tracked>0 with yes=0 means the predicate refused them (and the verdict strings in the
+// per-load logs say which rule did it); yes>0 with inside=0 means the radius is the problem.
+//
+// The field is `inside` and NOT `near`: minwindef.h has `#define near` (empty, a 16-bit
+// relic), so a member named `near` is silently deleted before the compiler sees it and the
+// struct fails to parse with a syntax error that names the line but not the cause.
+struct ZoneCounts {
+    size_t tracked = 0, yes = 0, inside = 0;
+};
+
+ZoneCounts zone_counts() {
+    Lock lock;
+    ZoneCounts c;
+    for (const auto& [k, nat] : g_natives) {
+        ++c.tracked;
+        if (nat.verdict != Verdict::Yes) continue;
+        ++c.yes;
+        const auto t = enemy_load::last_transform(nat.load);
+        if (t && distance_to_center(t->pos) <= hide_radius()) ++c.inside;
+    }
+    return c;
+}
+
 // The step's consequences (zone on / off) and the message for the host.
 std::optional<proto::EnemyZoneMsg> apply(const EnemyZoneMachine::Step& st) {
     std::optional<proto::EnemyZoneMsg> out;
@@ -478,8 +509,24 @@ std::optional<proto::EnemyZoneMsg> apply(const EnemyZoneMachine::Step& st) {
         g_restore.clear();  // back in the zone: whatever was still held stays so
         g_dropping = true;
         g_last_sweep = 0;
+        const ZoneCounts c = zone_counts();
         log::info("Suppress: zone ON ({} {:.0f} m away, {} natives to hide){}", lab ? "lab centre" : "host",
                   g_zone.last_distance(), natives_in_zone(), g_dry ? " - DRY RUN: nothing is hidden" : "");
+        // Printed unconditionally next to the line above, so "0 natives to hide" is never the
+        // last word. See zone_counts() for why the three numbers are the ones that matter.
+        if (c.inside == 0) {
+            log::info("Suppress: nothing to hide -- the mod has tracked {} actor load(s), {} passed "
+                      "the enemy test, {} are within {:.0f} m.{}",
+                      c.tracked, c.yes, c.inside, hide_radius(),
+                      c.tracked == 0
+                          ? " NO LOADS TRACKED AT ALL: the sniffer has not seen an ActorLoadDataAck"
+                            " yet, so there are no enemies to find here."
+                          : (c.yes == 0
+                                 ? " Loads were tracked but every one was refused; the per-load"
+                                   " verdict reasons above say which rule did it."
+                                 : " Enemies exist and passed the test, but none are close enough."
+                                   " Walk closer."));
+        }
     }
     if (st.turned_off) {
         g_dropping = false;
