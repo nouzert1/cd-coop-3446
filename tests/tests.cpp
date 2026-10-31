@@ -1,4 +1,4 @@
-// Unit tests for the protocol and the client session state machine.
+﻿// Unit tests for the protocol and the client session state machine.
 // No framework: each CHECK prints the failing line and the run exits non-zero.
 
 #include <cmath>
@@ -993,6 +993,27 @@ void test_enemy_zone_predicate() {
     CHECK(is_excluded_variant(55504));   // Boss_ReedDevil_DualSword
     CHECK(is_excluded_variant(60003));   // Boss_Dragon_*
     CHECK(origin_class(0x343A74A6) == 1 && origin_class(0xBF04A5ED) == 2 && origin_class(0x12345678) == 0);
+
+    // The record types the enemy relay may copy (boss_rules.h). This is the rule that
+    // decides whether the guest gets a copy of an actor at all, so it is pinned here rather
+    // than left to a live session:
+    //
+    //   type 3 (person)  -- always
+    //   type 4 (named)   -- ONLY a boss (research lines 400 and 458)
+    //   type 5 (vehicle) -- never, and NOT a bug: it carries closing risk 0x925F0E
+    //   type 7 (parts)   -- never relayed on its own; those are valid ATTACKERS
+    //
+    // If someone later relaxes type 5 to make dragon bosses work, this test failing is the
+    // point: read pendiente-jefes.md line 401 and the R2 risk row first. The dragon is a
+    // type 5, and enabling it without solving the vehicle branch closes the game.
+    CHECK(net::is_relayable_record_type(3, false));   // an ordinary monster, boss or not
+    CHECK(net::is_relayable_record_type(3, true));
+    CHECK(net::is_relayable_record_type(4, true));    // a named BOSS: the new case
+    CHECK(!net::is_relayable_record_type(4, false));  // a named non-boss: quest/scene actor
+    CHECK(!net::is_relayable_record_type(5, true));   // a vehicle boss (dragon): still refused
+    CHECK(!net::is_relayable_record_type(5, false));
+    CHECK(!net::is_relayable_record_type(7, true));   // a boss's weapon or breakable part
+    CHECK(!net::is_relayable_record_type(0, true));
     const ZoneRules plain{};
     LoadSpec bandit;
     {

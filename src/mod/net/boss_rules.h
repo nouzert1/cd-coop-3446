@@ -47,4 +47,33 @@ inline bool is_boss_stage_name(const std::string& name) {
     return false;
 }
 
+// The record type of an actor load whose copy the enemy relay may carry.
+//
+// The relay reads the type from the load at +2. Historically only type 3 (person)
+// was accepted, and the research (docs/research/pendiente-jefes.md line 67) says why
+// the rest were left out: "El relevo solo copia el tipo 3. Si un jefe llega como tipo 4
+// (personaje con nombre) o 5 (vehiculo: tanques, dragon, avion), hoy no se copia."
+//
+// TYPE 4 is now accepted, but ONLY for a boss -- the research's own prescription, twice:
+//   line 400  "aceptar el tipo 4 solo si es jefe"
+//   line 458  "copia de jefes de tipo 4 con la bandera de jefe"
+// A named NON-boss character stays refused. Named characters are quest and scene actors,
+// and the twin's safety rules (botin-invitado.md section 6) exclude exactly those: the twin
+// is an actor the GUEST's own server spawns, so it must be an ordinary world variant.
+//
+// TYPE 5 stays refused (vehicles: tank, plane, dragon) until the vehicle branch is solved.
+// It carries a known closing risk, 0x925F0E, that already cost a full diagnostic session
+// (docs/DIAGNOSTICO-HANG.md). A type 5 closes the game; this is not caution for its own sake.
+//
+// TYPE 7 (a boss's weapons and breakable parts) is a different question: those are valid
+// ATTACKERS in player_hits, not relayed copies of their own.
+//
+// `is_boss` is passed in rather than looked up here, so this stays a pure rule with no
+// dependency on boss_safe.cpp's mutable state and can be unit-tested.
+inline bool is_relayable_record_type(uint32_t type, bool is_boss) {
+    if (type == 3) return true;
+    if (type == 4) return is_boss;
+    return false;
+}
+
 }  // namespace cdmp::net

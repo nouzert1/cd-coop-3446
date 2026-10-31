@@ -29,6 +29,21 @@ namespace {
 
 using Bytes = std::vector<uint8_t>;
 
+// The record type of a load whose copy this relay may carry. The RULE lives in
+// boss_rules.h as a pure, unit-tested function (is_relayable_record_type) because the
+// decision protects the host's quest and the guest's world, and a rule that only runs in a
+// live session is a rule nobody checks. This wrapper supplies the one piece of state the
+// rule cannot see for itself: whether this key is a known boss.
+//
+// LOCK ORDER: two of the three callers already hold g_mutex, and boss_is_boss takes its OWN
+// mutex inside boss_safe.cpp. That is safe only because boss_safe.cpp never calls back into
+// this file -- verified, it has no reference to the relay at all. The order is always
+// relay-then-boss and never the reverse, so no cycle exists. If that ever stops being true,
+// this becomes a deadlock, so the invariant is written down here rather than left implicit.
+bool load_is_relayable(uint32_t type, uint32_t key) {
+    return is_relayable_record_type(type, boss_is_boss(key));
+}
+
 constexpr uint16_t kOpActorLoadDataAck = 2005;
 constexpr uint16_t kOpRemoveActorAck = 2516;
 constexpr uint16_t kOpStartActionReq = 2223;
@@ -251,7 +266,10 @@ std::vector<Candidate> candidates() {
     {
         std::lock_guard lock(g_mutex);
         for (const auto& [key, load] : g_loads) {
-            if (g_sent.count(key) || g_refused.count(key) || load.size() < 3 || load[2] != 3) continue;
+            if (g_sent.count(key) || g_refused.count(key) || load.size() < 3 ||
+                !load_is_relayable(load[2], key)) {
+                continue;
+            }
             auto e = g_engaged.find(key);
             keys.emplace_back(key, e != g_engaged.end() && now - e->second < kEngagedMs);
         }
@@ -867,7 +885,10 @@ std::vector<ZoneCandidate> zone_candidates(const PartnerZone& z, const proto::Ve
         std::lock_guard lock(g_mutex);
         const enemy_load::ZoneRules rules{z.caution, g_learnt_factions};
         for (const auto& [key, load] : g_loads) {
-            if (load.size() < 3 || load[2] != 3 || g_refused.count(key) || (!all && g_sent.count(key))) continue;
+            if (load.size() < 3 || !load_is_relayable(load[2], key) || g_refused.count(key) ||
+                (!all && g_sent.count(key))) {
+                continue;
+            }
             if (!is_zone_enemy_locked(key, rules)) continue;
             auto e = g_engaged.find(key);
             keys.emplace_back(key, e != g_engaged.end() && now - e->second < kEngagedMs);
@@ -1627,8 +1648,8 @@ bool check_spawn(uint32_t copy, const Bytes& spawn, Bytes& load, Bytes& action, 
     uint16_t len = 0;
     std::memcpy(&len, load.data(), 2);
     const uint32_t key = u32_at(load.data() + 3), owner = u32_at(load.data() + 7);
-    if (static_cast<size_t>(len) + 2 != load.size() || load[2] != 3 || key != copy || owner != 0 ||
-        u32_at(load.data() + 0x18) == 0) {
+    if (static_cast<size_t>(len) + 2 != load.size() || !load_is_relayable(load[2], key) || key != copy ||
+        owner != 0 || u32_at(load.data() + 0x18) == 0) {
         why = std::format("not one enemy record of the copy (length {}+2 of {}, type {}, key 0x{:08X}, owner 0x{:08X})",
                           len, load.size(), load[2], key, owner);
         return false;
