@@ -223,6 +223,39 @@ inline constexpr uintptr_t kVtClientActorManager = 0x5939CD8;  // 3424:0x5937C48
 inline constexpr uintptr_t kVtControlledActor = 0x5907C90;     // 3424:0x5905BE0
 inline constexpr uintptr_t kVtCharacterControl = 0x59388D0;    // 3424:0x5936838
 inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
+// ---- kFieldTimeClient: never exercised, so "correct" is unverified ---------
+// A live session with the world loaded is the only place this can be settled, and this
+// was investigated during one (2026-10-30, pid 36596: real HP 1125/1125, real position
+// -10679.82/611.65/-3896.42, the mod's own check agreeing with the game global to 0.05 m,
+// and kClientClockGlobal = 1). The block at 0x6EB2AD8 was still 32 zero bytes.
+//
+// That is still NOT proof the address is wrong, and it must not be recorded as one. The
+// reason is in the logs: `Config: time sync off` appears in every session on this machine,
+// because [coop] time_sync defaults to 0 (config.cpp:197) and no cdmp.ini sets it. The mod
+// has never called own_time() in a real session, so nothing has ever read this address and
+// no evidence either way exists. A stale address here cannot have caused anything the user
+// has seen, because the code that would read it has never run.
+//
+// Confirmed rather than assumed: the string `Config: time sync off` is in all five rotated
+// logs in build/bin/RelWithDebInfo, and no log contains a day/time line from the sync path.
+//
+// So this is not a defect to chase, it is a feature that has never been switched on. If
+// time sync is wanted, turn it on, then run diagnostico/check-fieldtime.ps1 -- with a world
+// loaded it settles in one command, and if the block is still zero after that, the address
+// HAS moved and then it needs re-measuring.
+//
+// What was tried and did not work, recorded so it is not repeated:
+//   * xrefs on 0x6EB2AD0-0x6EB2B00 -- on 3424 these land on exe+0x2ABFA9 and
+//     exe+0x2ABF86/87/8D, but the surrounding function is the logger's name-list setup
+//     (its `lea` targets a zero-filled registration table, the same shape at exe+0x2ABF83
+//     in both builds, pointing at a different table each time). Those xrefs are the
+//     logger, NOT the field time. Reading them as field-time writers sends the port off
+//     after the wrong function.
+//   * scanning the region live for a timestamp -- the .bss in that range holds runtime
+//     pointers and flags (vtable pointers, 0x7F... sentinels), so a "non-zero u64 near
+//     here" is not evidence of FieldTime.
+//   * findptr for the absolute address -- 0 results in both images.
+
 // ---- kVtPhysicsObject and kVtCamera stay 0, deliberately -------------------
 // These are NOT unresolved pending work, and the earlier note here got the reason
 // wrong. There is nothing to find: both are 0 on 3424 as well, and 0 is a value the
