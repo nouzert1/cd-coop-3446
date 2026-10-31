@@ -303,26 +303,42 @@ inline constexpr uintptr_t kVtClientActorManager = 0x5939CD8;  // 3424:0x5937C48
 inline constexpr uintptr_t kVtControlledActor = 0x5907C90;     // 3424:0x5905BE0
 inline constexpr uintptr_t kVtCharacterControl = 0x59388D0;    // 3424:0x5936838
 inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
-// ---- kFieldTimeClient: never exercised, so "correct" is unverified ---------
-// A live session with the world loaded is the only place this can be settled, and this
-// was investigated during one (2026-10-30, pid 36596: real HP 1125/1125, real position
-// -10679.82/611.65/-3896.42, the mod's own check agreeing with the game global to 0.05 m,
-// and kClientClockGlobal = 1). The block at 0x6EB2AD8 was still 32 zero bytes.
+// ---- kFieldTimeClient: MEASURED WRONG on 3446 (2026-10-30) -----------------
 //
-// That is still NOT proof the address is wrong, and it must not be recorded as one. The
-// reason is in the logs: `Config: time sync off` appears in every session on this machine,
-// because [coop] time_sync defaults to 0 (config.cpp:197) and no cdmp.ini sets it. The mod
-// has never called own_time() in a real session, so nothing has ever read this address and
-// no evidence either way exists. A stale address here cannot have caused anything the user
-// has seen, because the code that would read it has never run.
+// SETTLED. This is no longer "unverified because the feature never ran" -- it was measured
+// live with the world loaded, and the block is zero.
 //
-// Confirmed rather than assumed: the string `Config: time sync off` is in all five rotated
-// logs in build/bin/RelWithDebInfo, and no log contains a day/time line from the sync path.
+// The earlier note here argued the opposite: that `Config: time sync off` in every session
+// meant own_time() had never run, so nothing had ever read this address and no evidence
+// either way existed. That reasoning was sound as far as it went, but it left the item
+// unresolved when it did not have to be. The address can be tested WITHOUT the feature
+// being on: if the game writes FieldTime here, the bytes are non-zero whether or not the mod
+// reads them.
 //
-// So this is not a defect to chase, it is a feature that has never been switched on. If
-// time sync is wanted, turn it on, then run diagnostico/check-fieldtime.ps1 -- with a world
-// loaded it settles in one command, and if the block is still zero after that, the address
-// HAS moved and then it needs re-measuring.
+// Measurements (pid 37868, world loaded, character had moved):
+//
+//   exe+0x6EB2AD8   kFieldTimeClient    32 bytes of 0x00
+//   exe+0x71C0C20   kStaticPlayerPos    -10141.82, 607.67, -4091.08
+//   exe+0x70CDCAD   kClientClockGlobal  1
+//
+// The control is what makes this conclusive. check-fieldtime.ps1 now reads kStaticPlayerPos
+// in the same run and refuses to call a zero block meaningful unless the position is real --
+// otherwise "zero" cannot be told apart from "still in the menu", and those two lead to
+// opposite actions. With the position valid and a world-space coordinate set, a global this
+// code is supposed to be writing being all zero means the address moved.
+//
+// CONSEQUENCE TODAY: none. own_time() is the only reader and [coop] time_sync defaults to 0
+// (config.cpp:197), so a wrong address here has never been used and cannot have caused
+// anything the user has seen. Leaving it wrong costs the time sync feature, which is off.
+//
+// It stays at the 3424 value rather than 0, because unlike the action-layer sites there is
+// no guard that fails closed on a wrong address here -- there is simply no reader. Setting 0
+// would look like a deliberate "unavailable" marker and would be a lie about what is known.
+// This is recorded as WRONG so the next person does not read it as merely unverified.
+//
+// TO FIX: find who writes the world time on 3446 and re-measure. Do NOT guess an address:
+// a global read directly by base+offset, with no xref and no stored pointer, cannot be
+// validated by reading the file.
 //
 // What was tried and did not work, recorded so it is not repeated:
 //   * xrefs on 0x6EB2AD0-0x6EB2B00 -- on 3424 these land on exe+0x2ABFA9 and

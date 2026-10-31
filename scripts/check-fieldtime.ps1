@@ -71,6 +71,37 @@ $allzero = -not ($first | Where-Object { $_ -ne 0 })
 Write-Host ('bytes: {0}' -f (($first | ForEach-Object { '{0:X2}' -f $_ }) -join ' '))
 Write-Host ''
 
+# O CONTROLE, lido junto e nao pedido ao usuario. Sem isto o veredito "zerado" e'
+# ambiguo: pode ser "o mundo nao carregou" ou "o endereco mudou", e as duas levam a
+# acoes opostas. kStaticPlayerPos vive no mesmo kWorldSystemSlot e so' tem coordenadas
+# reais com o mundo carregado, entao ele separa os dois casos sozinho.
+#
+# Medido em 2026-10-30 com o mundo carregado: posicao real -10107.59/607.65/-4105.03
+# (batendo com a que o mod reporta) e o bloco do FieldTime em 32 bytes zero. Com o
+# controle dando real, "zerado" deixa de ser ambiguo e passa a ser conclusivo.
+function Read-Vec3 {
+    param([string] $E)
+    $raw = & $Probe --pid $Pid_ read $E --type f32 --count 3 2>&1
+    $v = @()
+    foreach ($l in $raw) {
+        if ($l -match ':\s*(-?[\d.]+)\s*$') { $v += [double]$matches[1] }
+    }
+    return ,$v
+}
+
+$world_ok = $false
+$pos = Read-Vec3 'exe+0x71C0C20'   # kStaticPlayerPos
+if ($pos.Count -eq 3) {
+    # Uma posicao de mundo real: nao e' a origem e nao e' o placeholder de carregamento
+    # (0, 1000.15, 0) que o mod mostra antes de entrar no mundo.
+    $not_origin = ([Math]::Abs($pos[0]) + [Math]::Abs($pos[2])) -gt 1.0
+    $not_park = -not ([Math]::Abs($pos[0]) -lt 0.01 -and [Math]::Abs($pos[1] - 1000.15) -lt 0.01 -and [Math]::Abs($pos[2]) -lt 0.01)
+    $world_ok = $not_origin -and $not_park
+}
+Write-Host ('controle: kStaticPlayerPos = {0}' -f (($pos | ForEach-Object { '{0:F2}' -f $_ }) -join ', '))
+Write-Host ('          mundo carregado = {0}' -f $(if ($world_ok) { 'SIM' } else { 'NAO (no menu ou carregando)' }))
+Write-Host ''
+
 # Campo `anchor`: u64. Onde ele cai no layout nao importa para este teste -- o que
 # importa e' se existe algum u64 grande no bloco, que e' a assinatura de um timestamp.
 $cands = @()
@@ -91,15 +122,26 @@ for ($i = 1; $i -lt $snaps.Count; $i++) {
 }
 
 Write-Host '=== VEREDITO ==='
-if ($allzero) {
-    Write-Host '  ZERADO. Duas leituras iguais e tudo zero.'
+if ($allzero -and $world_ok) {
+    Write-Host '  ZERADO COM O MUNDO CARREGADO: O ENDERECO MUDOU.'
     Write-Host ''
-    Write-Host '  Isto NAO decide sozinho. Duas causas possiveis:'
-    Write-Host '    (a) o mundo ainda nao esta carregado - entre no jogo e mova o personagem'
-    Write-Host '    (b) o endereco mudou no 3446 e este bloco ficou orfao'
+    Write-Host '  O controle deu real, entao "o mundo nao carregou" esta descartado. Um global'
+    Write-Host '  que deveria estar sendo escrito pelo jogo esta em 32 bytes zero, com a sessao'
+    Write-Host '  viva e a posicao do jogador valida. kFieldTimeClient NAO esta em'
+    Write-Host ('  exe+0x{0:X} neste build.' -f $Rva)
     Write-Host ''
-    Write-Host '  Confirme (a) antes de concluir (b): o mod tambem exige movimento, e'
-    Write-Host '  kStaticPlayerPos deve ter coordenadas reais se houver sessao.'
+    Write-Host '  Consequencia: NENHUMA, ate alguem ligar [coop] time_sync. own_time() e'' o unico'
+    Write-Host '  leitor e a feature vem desligada por padrao (config.cpp:197), entao o valor'
+    Write-Host '  errado nunca chegou a ser usado e nao causou nada que o usuario tenha visto.'
+    Write-Host ''
+    Write-Host '  Para consertar: localizar o escritor do tempo no 3446 e remedir. NAO chutar um'
+    Write-Host '  endereco: um global lido direto por base+offset, sem xref e sem ponteiro, nao'
+    Write-Host '  tem como ser validado por leitura de arquivo.'
+} elseif ($allzero) {
+    Write-Host '  ZERADO, MAS O CONTROLE NAO DEU REAL.'
+    Write-Host ''
+    Write-Host '  Nao decide nada: o mundo provavelmente ainda nao esta carregado. Entre no jogo,'
+    Write-Host '  ande com o personagem uma vez e rode de novo.'
 } elseif ($cands.Count -gt 0) {
     Write-Host '  ENCONTRADO. Ha um u64 com cara de timestamp no bloco:'
     $cands | ForEach-Object { Write-Host ('    +0x{0,-2} = {1}  ({2:yyyy-MM-dd HH:mm:ss})' -f $_.Offset, $_.Value, $_.When) }
