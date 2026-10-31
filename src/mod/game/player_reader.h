@@ -50,3 +50,13 @@ private:
 };
 
 }  // namespace cdmp::game
+
+// TEMPORARY DIAGNOSTIC, defined in player_reader.cpp. Sweeps the mod's data range for
+// the WorldSystem slot by what it points at (a live ClientActorManager), and logs each
+// candidate. Returns the number found so the caller can keep trying until the game has
+// finished loading -- a sweep that runs before the world exists cannot distinguish
+// "not in this range" from "not created yet". Called from late_init while
+// kWorldSystemSlot is being re-measured for 3460; delete with its definition.
+namespace cdmp::game::diag {
+int probe_world_slot(uintptr_t base);
+}

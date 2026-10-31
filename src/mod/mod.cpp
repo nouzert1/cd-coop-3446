@@ -138,7 +138,7 @@ public:
     explicit LocalSource(bool in_game) : in_game_(in_game) {
         if (!in_game_) return;
         if (reader_.init()) {
-            log::info("Game reader enabled (build 1.0.0.2976 offsets)");
+            log::info("Game reader enabled (build 1.0.0.3460 offsets)");
         } else {
             log::warn("Game reader DISABLED: {}. Only networking will run.",
                       reader_.last_failure());
@@ -762,6 +762,31 @@ DWORD WINAPI late_init(LPVOID param) {
         }
         if (stop_requested(5000)) return 0;
         log::info("Late init: game is up, installing hooks");
+        // TEMPORARY: kWorldSystemSlot carries a 3446 value that is known wrong on 3460
+        // (it points at a GlobalVariableManager, and the log repeats "WorldSystem not
+        // created" with the character walking). Sweeps the mod's data range for a slot
+        // whose target holds a live ClientActorManager, which identifies it by what it
+        // points at rather than by an address anyone remembered.
+        //
+        // Runs on its own thread and repeats, because the first attempt ran at 2.7 GB
+        // while the game was still starting and reported "no candidate" -- which reads
+        // as "the WorldSystem is not in this range" when the truth was that it did not
+        // exist yet. Retrying until it finds one removes that ambiguity entirely.
+        CloseHandle(CreateThread(
+            nullptr, 0,
+            [](LPVOID) -> DWORD {
+                const auto base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+                for (int i = 0; i < 40 && !stop_requested(0); ++i) {
+                    if (game::diag::probe_world_slot(base) > 0) {
+                        log::warn("WorldSlot probe: done after {} attempt(s)", i + 1);
+                        return 0;
+                    }
+                    Sleep(3000);
+                }
+                log::warn("WorldSlot probe: gave up after 40 attempts -- WorldSystem never seen");
+                return 0;
+            },
+            nullptr, 0, nullptr));
     }
     bool sniffer_ok = false;
     if (init->sniffer && init->in_game) sniffer_ok = net::sniffer_install(init->dir, g_stop, init->record);

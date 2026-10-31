@@ -194,53 +194,89 @@ inline constexpr uintptr_t kServerOtherEquipWriter = 0x29EDD11;  // WRONG on 344
 inline constexpr uintptr_t kTrocInstancesBegin = 0x6E86D10;  // 3446:0x6E82D10
 inline constexpr uintptr_t kTrocInstancesEnd = 0x6EBA378;    // 3446:0x6EB6378
 
-// ---- data globals: INHERITED, AND SUSPECT --------------------------------
-// These carry their 3446 values. They are restated rather than omitted because the
-// mod cannot be built without them, but they are the least trustworthy part of this
-// table and are marked as such.
+// ---- data globals: MEASURED LIVE ON 3460 --------------------------------
 //
-// WHAT WENT WRONG IN MEASURING THEM. Reading these globals through
-// `cdmp_probe --pid` gave results that contradicted each other in the same session,
-// on the same live process, and for a while that was written down here as the
-// instrument disagreeing with itself. That was WRONG and is corrected: the tool is
-// fine, the calls were mine. `scan --heap` was later used successfully to find the
-// live ClientActorManager (one instance, expected vtable), which settles it.
+// kWorldSystemSlot: 0x71B5CF0. Measured live, not derived.
 //
-// The real finding is narrower and worse. The address in use, 0x71B1A40, holds a
-// pointer to an object whose vtable is GlobalVariableManager -- NOT the WorldSystem.
-// Measured live, the log repeats `WorldSystem not created` with the character loaded
-// and walking. And GlobalVariableManager itself moved by +0x5680 between the builds,
-// a fifth distinct delta alongside +0x4000, +0x4010, +0x4018 and +0x990 measured in
-// this same port.
+// HOW IT WAS FOUND. The 3446 value (0x71B1A40) is wrong on this build and reads as a
+// GlobalVariableManager. Offline routes all failed for stated reasons, so the mod
+// asked the game: it swept its own data range for a slot whose target holds the live
+// ClientActorManager, and found exactly two candidates, 0x71B5CA0 and 0x71B5CF0.
 //
-// The likely cause is not a shift but a REORDER: the game appears to have rearranged
-// its system objects in .data, and GlobalVariableManager now sits where the
-// WorldSystem used to. Five different deltas in one patch is the real lesson: a delta
-// is not a measuring instrument in this binary. Any single one of them, applied to
-// the whole table, would have fixed part of it and silently broken the rest.
+// WHY 0x71B5CF0 AND NOT 0x71B5CA0. Neither could be separated offline -- both point
+// at a world whose [+0x30] is the SAME single live manager, and both reach the same
+// controlled actor. The deciding evidence is the position: walking the full chain
+// from 0x71B5CF0 was traced live, hop by hop, and every hop validated by the game's
+// own type rather than by an address:
 //
-// HOW TO SETTLE THEM. Through the mod, not the probe. PlayerReader computes
-// `static_pos_error` -- the distance between the position derived from the chain and
-// the game's own world-position global (player_reader.cpp:122-124) -- and
-// mod.cpp:178 prints it as `check vs game global {:.2f} m`. A correct chain reports
-// centimetres; a wrong one reports something absurd. That number is self-checking:
-// it compares two independent derivations, so it does not depend on any external
-// tool agreeing with itself.
+//   [0x71B5CF0]              -> world   0x32F61FAE100
+//     world  [+0x30]         -> manager 0x32F6E3D4600   RTTI ClientActorManager
+//       mgr  [+0x50]         -> actor   0x32F97FED200   RTTI ClientChildOnlyInGameActor
+//         actor[+0x60] (u32) -> 0xA0100001              actor key, same 0xA010____
+//                                                       shape the 3446 player used
+//         actor[+0x68]       -> comps   0x32F72F45200
+//           comps[+0x40]     -> ctl     0x33019E77D00   RTTI ClientCharacterControlActorComponent
+//             ctl  (vtable)  -> 0x14593C8E0            == kVtCharacterControl
+//             ctl  [+0x140]  -> inner   0x32F562D3800
+//               inner[+0x2C0] -> phys   0x32F56A23C00
+//                 phys [+0x90] -> (-636.10, 613.62, -842.84)
 //
-// If the live run reports a huge static_pos_error, the culprit is most likely in
-// this block rather than in the code addresses above, each of which was confirmed by
-// prologue bytes or by RTTI.
-inline constexpr uintptr_t kWorldSystemSlot = 0x71B1A40;  // 3446 value, unverified on 3460
-inline constexpr uintptr_t kCameraSlot = 0x70CDEA8;       // 3446 value, unverified on 3460
-inline constexpr uintptr_t kStaticPlayerPos = 0x71C0C20;  // 3446 value, unverified on 3460
-inline constexpr uintptr_t kChunkOrigin = 0x719DCA0;      // 3446 value, unverified on 3460
-inline constexpr uintptr_t kMinimapIconRoot = 0x71B1DD8;     // 3446 value, unverified on 3460
-inline constexpr uintptr_t kMinimapIconRootAlt = 0x71B1DE0;  // 3446 value, unverified on 3460
-inline constexpr uintptr_t kClientClockBias = 0x71B1CE8;     // 3446 value, unverified on 3460
-inline constexpr uintptr_t kClientClockGlobal = 0x70CDCAD;   // 3446 value, unverified on 3460
+// The final value is a coherent world position -- Y is an elevation, X and Z are
+// ground coordinates -- and it came out of a chain where all four type checks passed.
+// That is the strongest form of evidence available here: it does not depend on any
+// offset being remembered correctly, only on the game's own RTTI agreeing at each hop.
+//
+// The two candidates are 8 bytes apart in their slot array but point at worlds 0x900
+// apart. Note what this means, because it is the same trap as the previous port: the
+// 3446 header recorded that the game itself reads 0x71B1A38 while kWorldSystemSlot was
+// 0x71B1A40, "both hold valid pointers and both are used". So two plausible world
+// slots is a property of this game, not an artefact of a bad measurement, and picking
+// the one that merely looks closest to the old address is not a method.
+
+// ---- data globals: STILL SUSPECT ----------------------------------------
+//
+// These carry their 3446 values and are UNVERIFIED on 3460. The list shrank this round:
+// kWorldSystemSlot is now measured (above), and the chain from it to a position was
+// traced live, which incidentally confirms kWorldSystem_ActorManager, kActor_ComponentTable,
+// kComponents_CharacterControl, kActorManager_ControlledActor, kControl_Inner,
+// kControlInner_Physics and kPhysics_Position -- all the STRUCT offsets, which is what
+// the comment at the top of this file predicted (structure survives a patch; addresses
+// do not).
+//
+// WHAT WENT WRONG EARLIER, recorded so it is not repeated. An earlier revision of this
+// comment claimed cdmp_probe contradicts itself. That was WRONG. The probe works; the
+// calls were bad. Two specific traps, both hit in this port:
+//   * `troc --begin X --end Y` is silently ignored -- the arguments are POSITIONAL. The
+//     default range was swept and returned 0, which read as "the handler array moved
+//     somewhere unknown". It had moved by +0x4000, and was found as soon as the call
+//     was written correctly.
+//   * `xrefs` reports the address of the SHIFTED OPERAND, not the instruction start.
+//     Three "sites" for one global were one instruction counted three ways.
+// Both produced confident, specific, wrong numbers. A tool that reports a fact about
+// the game when the defect is in the call is the single most expensive failure mode in
+// this project.
+//
+// kStaticPlayerPos deserves a specific warning. Read as f32 it returns -88.3066, which
+// LOOKS like a coordinate; `dump` shows the bytes are pointers, and following them
+// yields nothing that is a position. The plausible-looking float was a coincidence of
+// bit patterns. Do not accept a value because it resembles the thing you wanted.
+//
+// HOW TO SETTLE THE REST. Through the mod, not the probe. PlayerReader computes
+// `static_pos_error` -- the distance between the position it derives from the chain and
+// this global (player_reader.cpp:122-124) -- printed as `check vs game global {:.2f} m`.
+// A correct chain reports centimetres. That number is self-checking: it compares two
+// independent derivations, so it does not depend on any external tool agreeing.
+inline constexpr uintptr_t kWorldSystemSlot = 0x71B5CF0;  // measured live; 3446:0x71B1A40
+inline constexpr uintptr_t kCameraSlot = 0x70CDEA8;       // 3446 value, UNVERIFIED on 3460
+inline constexpr uintptr_t kStaticPlayerPos = 0x71C0C20;  // 3446 value, UNVERIFIED (see above)
+inline constexpr uintptr_t kChunkOrigin = 0x719DCA0;      // 3446 value, UNVERIFIED on 3460
+inline constexpr uintptr_t kMinimapIconRoot = 0x71B1DD8;     // 3446 value, UNVERIFIED
+inline constexpr uintptr_t kMinimapIconRootAlt = 0x71B1DE0;  // 3446 value, UNVERIFIED
+inline constexpr uintptr_t kClientClockBias = 0x71B1CE8;     // 3446 value, UNVERIFIED
+inline constexpr uintptr_t kClientClockGlobal = 0x70CDCAD;   // 3446 value, UNVERIFIED
 inline constexpr uintptr_t kClientFrameClockMs = 0x70CDCE1;  // = flag + 0x34
 inline constexpr uintptr_t kClientFrameClockUs = 0x70CDCE9;  // = flag + 0x3C
-inline constexpr uintptr_t kClientClock = 0x1416B80;         // 3446 value, unverified on 3460
+inline constexpr uintptr_t kClientClock = 0x1416B80;         // 3446 value, UNVERIFIED
 
 // ---- inherited unchanged from 3446 ----------------------------------------
 // RTTI class count is identical between the two builds (15262 on each), and the
