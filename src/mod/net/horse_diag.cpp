@@ -99,14 +99,32 @@ void read_restore_data(uintptr_t cc, uint8_t (&raw)[0x10], uint64_t& f8) {
     }
 }
 
-bool is_copy(uint32_t key) { return key == kCopyHorse || is_enemy_copy_key(key); }
+// Keys whose actor the containment may have to skip.
+//
+// The other player's character belongs here and was missing: kPuppetPlayer and
+// kPuppetBody are built by remote_puppet.cpp and are exactly the actors this file
+// exists to protect, so leaving them out meant the guard could never fire for the one
+// case that has actually crashed the host. Found by an external review of this file
+// (30/10/2026) that read is_copy() against the key list in the puppet code.
+//
+// The body is included too, not just the player: both are copied actors driven by
+// replayed packets rather than by the local world, which is what makes them the ones
+// that can arrive with a layer that has a chart and no action.
+inline constexpr uint32_t kPuppetPlayerKey = 0xA010F001;
+inline constexpr uint32_t kPuppetBodyKey = 0xB010F001;
+bool is_copy(uint32_t key) {
+    return key == kCopyHorse || is_enemy_copy_key(key) || key == kPuppetPlayerKey || key == kPuppetBodyKey;
+}
 
 bool watched(uint32_t key) {
     return is_copy(key) || (key && key == g_watch_real.load(std::memory_order_relaxed));
 }
 
 const char* who(uint32_t key) {
-    return key == kCopyHorse ? "COPY" : is_enemy_copy_key(key) ? "ENEMY COPY" : "real";
+    if (key == kCopyHorse) return "COPY";
+    if (is_enemy_copy_key(key)) return "ENEMY COPY";
+    if (key == kPuppetPlayerKey || key == kPuppetBodyKey) return "OTHER PLAYER";
+    return "real";
 }
 
 // Same "shape" = same nullness of every field (pointers themselves change).
@@ -235,7 +253,28 @@ bool horse_diag_install(bool contain) {
         g_pending_hook = {};
         return false;
     }
-    g_contain = contain && hook(kCcPost, g_post_hook, on_cc_post);
+    // If the post-update hook is asked for and does not install, the containment is
+    // incomplete, and the caller must not be told it is armed.
+    //
+    // This returned true unconditionally, so a request for containment that only got
+    // three of its four hooks was reported as success: mod.cpp reads the return value
+    // as `contained` and enables the horse and enemy copies on the strength of it.
+    // Those copies then run without the post-update pass that exists to catch a layer
+    // with a chart and no action -- the exact state the containment was written for.
+    // Found by an external review of this file (30/10/2026).
+    //
+    // Partial installs are now torn down rather than left half-armed, because a
+    // containment that fires on some paths and not others is worse than none: it makes
+    // the failure intermittent instead of reproducible.
+    if (contain && !hook(kCcPost, g_post_hook, on_cc_post)) {
+        g_post_hook = {};
+        g_cc_hook = {};
+        g_restore_hook = {};
+        g_pending_hook = {};
+        log::warn("HorseDiag: post-update hook not installed; containment refused (all four hooks uninstalled)");
+        return false;
+    }
+    g_contain = contain;
     log::info("HorseDiag: installed (containment {})", g_contain ? "on" : "off");
     return true;
 }

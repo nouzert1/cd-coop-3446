@@ -183,7 +183,14 @@ Two lines that look like errors and are **not**:
 - `Camera: camera block sentinel mismatch` — a diagnostic the game patch moved. It costs
   only an on-screen name label.
 
-Both players must be **Steam friends**, and both must run build `{{BUILD_ID}}`.
+Both players must be **Steam friends**, and both should run build `{{BUILD_ID}}`.
+
+Be precise about what a mismatch does, because an earlier version of this document got it
+wrong: `ClientSession::check_build` records a warning and the HUD displays it, and
+**nothing blocks the session or the spawn**. It is a signal that the two sides are not in a
+controlled configuration — not a switch that turns the mod off, and its absence does not
+prove the build is the problem. Reading the code is what settled this; the message alone
+does not.
 
 ---
 

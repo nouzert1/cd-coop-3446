@@ -546,12 +546,15 @@ if (-not (Test-Path (Join-Path $kit 'LEIA-ME.txt'))) { throw 'LEIA-ME.txt is mis
 
 # What the guest checks to know he installed THIS kit and not an older one.
 #
-# A version mismatch is the single most confusing failure this mod has: everything
-# connects, the distance updates (the position exchange works), and no character
-# appears -- because the mod refuses to spawn one when the two build ids differ, so
-# the test looks almost-working and the cause is invisible. Printing both the build id
-# (what the panel shows) and the file hash (what Windows shows) turns that into a
-# two-second check, in the guide and in INSTALL.md.
+# Printing both the build id (what the panel shows) and the file hash (what Windows shows)
+# turns "which ZIP do I have" into a two-second check, in the guide and in INSTALL.md.
+#
+# Be accurate about what a mismatch MEANS, because this comment used to overstate it: it
+# claimed the mod refuses to spawn when the build ids differ. It does not. check_build()
+# in client_session.cpp records a warning that the HUD displays, and nothing in the spawn
+# path consults it. Keeping both sides on one build is still what makes a test controlled,
+# and the number is worth printing for that reason -- but a mismatch is not a switch, and
+# saying it was would send the next person looking in the wrong place.
 #
 # Defined here, before both documents, because each of them interpolates these values.
 $build_id_upper = if ($built) { $built.ToUpper() } else { '(unknown)' }
