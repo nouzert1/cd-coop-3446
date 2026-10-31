@@ -407,6 +407,18 @@ site_expect = [
     ('kActionLayersAdvance', 0x232A8B0,
      '74 51 4C 89 3F 44 38 3E 74 32 48 C7 C3 FF FF FF',
      'puppet_install_layer_guards; guard for the enemy relay'),
+    ('kMinimapIconDecide', 0x9E8A7D,
+     '80 7C 24 48 00 75 6F 8B 05 46 3D 75 06 41 89 06',
+     'minimap icon decision (mid-hook)'),
+    ('kServerOtherEquipWriter', 0x29EDD11,
+     '48 8B 84 24 E0 10 00 00 48 8B 10 48 85 D2 74 0A',
+     'other-player equipment writer (was one byte early on 3424)'),
+    ('kClientPostPacket', 0x3A55B0,
+     '48 89 5C 24 10 4C 89 4C 24 20 55 56 57 41 54 41',
+     'packet send path'),
+    ('kClientOnRecvPacket', 0x3A5940,
+     '48 89 5C 24 08 48 89 74 24 10 48 89 7C 24 18 55',
+     'packet receive path'),
 ]
 
 
