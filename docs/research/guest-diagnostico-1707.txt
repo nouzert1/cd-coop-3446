@@ -1,0 +1,89 @@
+﻿cdmp -- diagnostico do CONVIDADO
+gerado em 2026-10-31 17:07:19
+
+======================================================================
+1. O JOGO
+======================================================================
+  pasta        : C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64
+  versao       : 1.0.0.3460
+  PE timestamp : 0x6AE58024
+  -> bate com o que o mod espera (0x6AE58024)
+  -> OK: e' a versao que o mod espera
+
+======================================================================
+2. ARQUIVOS DO MOD NA PASTA DO JOGO
+======================================================================
+  OK      cdmp.asi        4.349.952 bytes   o mod
+          sha256 556D46C4152AD70A0374898EBE21C3381EC011D655C4CCF72FE1EAA92DD1BDDB
+  OK      cdmp.ini            8.022 bytes   a configuracao
+  OK      winmm.dll       1.198.304 bytes   o carregador (renomeado de dinput8.dll)
+          sha256 031A3E5576D91DCE1E438D36B9A3D462C7334AB4791990A8FF1E3DDC0E132DAF
+  FALTA   dinput8.dll    
+
+  QUAL KIT ESTA' INSTALADO:
+  ATUAL: v0.16.0-3460 -- o kit certo
+
+  DIAGNOSTICO DE INSTALACAO:
+    os 3 arquivos estao no lugar
+
+  outros arquivos que poderiam competir (esperado: nenhum):
+    nenhum
+
+======================================================================
+3. CONFIGURACAO (cdmp.ini)
+======================================================================
+  [net] enabled          = 1
+  [net] transport        = steam
+  [net] role             = guest
+  [steam] peer_steamid     = 76561199441047799
+  [room] code             = 
+  [overlay] enabled          = 1
+  [sniffer] enabled          = 1
+  [coop] enabled          = 1
+  [coop] delay_ms         = 300
+  [coop] enemy_auto       = 1
+  [coop] guest_hits       = 1
+  [coop] boss_safe        = 1
+  [coop] guest_loot       = 1
+
+  trecho bruto de [net] e [coop]:
+    [net]
+    enabled=1
+    ; steam = play with a Steam friend; udp = tests on this PC only (cdmp_peer.exe)
+    transport=steam
+    ; guest connects to the host or to cdmp_peer; host waits for one player
+    role=guest
+    ; UDP: address of the host or of cdmp_peer.exe (a UDP host listens on peer_port)
+    peer_host=127.0.0.1
+    peer_port=37015
+    send_rate_hz=20
+    
+    [steam]
+    ; Guest: the host's SteamID64 (empty = the only friend playing Crimson Desert)
+
+======================================================================
+4. O LOG DO MOD (cdmp.log)
+======================================================================
+  nao consegui ler: nao existe
+
+  ISTO E' UM RESULTADO, NAO UM ERRO:
+    O cdmp.log nao existe -> o mod NUNCA CARREGOU.
+    Causa quase certa: o rename do dinput8.dll para winmm.dll nao foi feito
+    na secao 2. Confira a lista de arquivos no item 2 acima.
+
+======================================================================
+5. CRASH REGISTRADO PELO WINDOWS
+======================================================================
+  nenhum. Se o jogo fechou sozinho sem aparecer aqui, o processo morreu de um jeito
+  que o Windows nao registrou -- o que costuma apontar para o mod, nao para o jogo.
+
+======================================================================
+6. VEREDITO
+======================================================================
+  O MOD NAO CARREGOU. Nada mais importa ate' isso ser resolvido.
+  1) o dinput8.dll foi renomeado para winmm.dll?
+  2) os 3 arquivos (cdmp.asi, cdmp.ini, winmm.dll) estao na pasta bin64?
+
+----------------------------------------------------------------------
+Mande ESTE ARQUIVO INTEIRO para o anfitriao:
+  C:\Users\Luan\Desktop\cdmp-diagnostico-2026-10-31-1707.txt
