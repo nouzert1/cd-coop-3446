@@ -70,17 +70,55 @@ compiler emitted a different register set this build. Offsets are not portable a
 patches and neither are prologues; both must be re-measured every time.
 
 
-NOT FOUND
----------
+MEASURED SECOND: kRestore = exe+0x948240
+--------------------------------------
+
+Found by the same behaviour method, two measurements:
+
+  1. Struct fields. The body reads exactly the set on_restore walks:
+
+       exe+0x94828C   mov rax, [r13+0x08]     -> actor
+       exe+0x9482AF   mov rax, [r13+0x40]     -> state
+       exe+0x9482B3   cmp [rax+0x30], r14b    -> restore
+       exe+0x94835D   mov rcx, [r13+0x88]     -> layer[0]
+       exe+0x9483D2   mov rcx, [r13+0x90]     -> layer[1]
+
+     Note `this` is in r13 here, not rbx as in kCcUpdate. The register holding `this` is
+     not stable across functions and must not be assumed; the offsets are what identify it.
+     The function runs 290 instructions to its ret at exe+0x9486B6, which fits a restore
+     routine that copies the saved bytes back.
+
+  2. Its 16-byte prologue is byte-identical to the 3424 value
+     (48 8B C4 48 89 58 20 48 89 50 10 55 56 57 41 54). This is corroboration, NOT the
+     basis: kCcUpdate's prologue did NOT survive the patch, so a matching prologue is luck,
+     and treating it as evidence would be the same mistake that made the byte-signature
+     approach useless. The behaviour above is what identifies the function; the prologue
+     merely agrees.
+
+It was found by scanning the prologues from the 3424 value's own signature: an 18-match
+scan whose only hit inside the CC code region was exe+0x948240. Proximity to kCcUpdate is
+not evidence by itself, but it narrowed 18 candidates to one, and the struct fields then
+decided it.
+
+THE DELTA CHANGED, WHICH IS WHY (2) BELOW IS DEAD
+-------------------------------------------------
+
+  kCcUpdate -> kRestore:  3424 = 0x4B30    3446 = 0x6500
+
+This is measured, not inferred. It is a second, independent reason a fixed delta cannot
+port these addresses, on top of the 0x35 spread already measured across the globals. The
+idea is attractive because it is cheap; it has now been falsified twice, and is written
+down so it is not reached for a third time.
 
 kCcPost, kRestore and kPending are still unresolved.
 
 What was tried and failed, recorded so it is not repeated:
 
   1. Byte signatures - 18-30+ matches each. No discrimination.
-  2. Fixed delta from kCcUpdate (+0x1190 / +0x4B30, the 3424 gaps). WRONG: the port
-     already established that the delta between builds is not constant (it spreads 0x35
-     across the globals), so reusing a gap is not sound.
+  2. Fixed delta from kCcUpdate. WRONG twice over: the delta between builds is not
+     constant (0x35 spread across the globals, and 0x4B30 -> 0x6500 measured directly
+     between kCcUpdate and kRestore), and kCcUpdate is only 311 bytes on 3446, so the 3424
+     gap to kCcPost (0x1190) cannot fit inside it at all.
   3. Scoring every vtable method by how many struct offsets it touches. This DOES
      surface kCcUpdate correctly, so the metric is valid, but the runner-up candidates
      (slots 45, 56, 59) each turned out to touch only one or two offsets on inspection -
@@ -88,12 +126,42 @@ What was tried and failed, recorded so it is not repeated:
      at exe+0x94A26C.
   4. xrefs on exe+0x941D40: no RIP-relative reference, as expected for a virtual method
      reached through the vtable.
+  5. Scanning for the kPending prologue (48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57):
+     30+ matches, none in the 0x23xxxx region the 3424 address came from. kPending's
+     prologue did not survive the patch either.
+  6. Scanning for `movzx [reg+0xA8]` (the pending byte read_state touches): 8 hits; the
+     three in the 0x23xxxx range (exe+0x238C4DF and neighbours) do not belong to a function
+     touching the other struct offsets - exe+0x238C3C0 reads none of +0x08/+0x40/+0x80/
+     +0x88/+0x90/+0xA8. False positive.
+  7. Walking the CC vtable for entries outside the CC code range: ~50 candidates
+     (slots 1, 8-14, 17, 20, 21, 23, 26-39, 42, 57, 60, 64, 73-78, 90-100, 165, 181,
+     183-195), which is not a narrowing. kPending appears NOT to be a
+     ClientCharacterControl method at all: at 0x2329D70 on 3424 it sits in a different
+     region from every other CC site, so searching the vtable is likely the wrong place.
 
-Next step that is actually promising: kCcPost is the post-update pass over the same
-component, so look for the function that the kCcUpdate CALL SITE reaches - i.e. disassemble
-past exe+0x941D40's tail and find the sibling methods invoked in the same frame, rather
-than scanning the whole image. Failing that, resolve it live: hook nothing, read the
-vtable slot ordering at runtime in a game that is already running, and correlate.
+  8. Chasing callers of kRestore directly. The 3424 report ties the chain together
+     (docs/INFORME-CABALLO-CRASH.md):
+
+       update actor 0x8B56D0 -> CC update 0x85FBA0 -> 0x863E80 -> 0x2329700 (layer) -> 0x1F63F70
+
+     where 0x2329700 advances the two layers and 0x2329D70 (kPending) sits 0x670 past it.
+     Porting that chain means finding 0x8B56D0 and 0x863E80 on 3446, not chasing the two
+     site addresses. The layer walker is the more promising of the two because it has a
+     behaviour nothing else shares: it checks layer+0x110 != 0, dt > 0 and rate > 0, and
+     does NOT check +0x18. A scan for `mov reg, [reg+0x110]` returned 15+ hits, none in
+     the 0x23xxxx region, so the walker moved region too - the chain has to be walked from
+     the actor-update end, or 0x2329700 re-identified by its unique offset set.
+
+A STRUCTURAL NOTE THAT MATTERS FOR kCcPost
+------------------------------------------
+
+kCcUpdate is 311 bytes and ends at a `ret` that is NOT the end of its logical body: three
+`jnz` target exe+0x941DB6, PAST the ret, and that region jumps back to exe+0x941DA4. The
+compiler split the function in two. So kCcPost may not be "the next function along" at
+all - it may be a point INSIDE a larger body, which is exactly what a mid-hook expects,
+and would explain why searching for the next prologue keeps failing. This is the thread
+worth pulling next: disassembling the region the jnz targets and looking for a point where
+the component is in the post-update state.
 
 
 WHAT THIS DOES AND DOES NOT BUY
