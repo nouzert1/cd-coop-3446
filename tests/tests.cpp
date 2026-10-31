@@ -1,4 +1,4 @@
-﻿// Unit tests for the protocol and the client session state machine.
+// Unit tests for the protocol and the client session state machine.
 // No framework: each CHECK prints the failing line and the run exits non-zero.
 
 #include <cmath>
@@ -1014,6 +1014,15 @@ void test_enemy_zone_predicate() {
     CHECK(!net::is_relayable_record_type(5, false));
     CHECK(!net::is_relayable_record_type(7, true));   // a boss's weapon or breakable part
     CHECK(!net::is_relayable_record_type(0, true));
+
+    // kNoVariant: "this copy has no variant field" must not be confusable with "its variant is
+    // 0". The relay stamps it on any copy whose load is not a type 3, and loot_twin refuses on
+    // it by name -- so the boss-loot refusal does not rest on is_excluded_variant, a table that
+    // has never heard of the difference (and in which 0 does not appear).
+    //
+    // A real variant is never the sentinel, or the two cases would collide:
+    static_assert(net::kNoVariant != 0, "0 is a legitimate absence marker in loot_on_copy_died");
+    CHECK(net::kNoVariant > 0xFFFFu);   // far above any variant the game uses (they are ~400-1000)
     const ZoneRules plain{};
     LoadSpec bandit;
     {

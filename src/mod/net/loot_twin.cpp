@@ -17,6 +17,7 @@
 #include "common/keys.h"
 #include "mod/game/actor_lookup.h"
 #include "mod/log.h"
+#include "mod/net/boss_rules.h"   // kNoVariant
 #include "mod/net/enemy_relay.h"
 #include "mod/net/local_capture.h"
 #include "mod/net/remote_puppet.h"
@@ -205,7 +206,14 @@ void loot_observe_c2s(const uint8_t* packet, size_t size) {
 }
 
 bool loot_on_copy_died(uint32_t copy, uint32_t variant, uint64_t /*delay_ms*/) {
-    if (!g_enabled || !variant) return false;
+    // kNoVariant (enemy_relay.cpp) means the copy's load was not a type 3, so no variant field
+    // exists to read. It is refused by name, before the is_excluded_variant lookup below, so
+    // the refusal does not depend on a table that has never heard of this case.
+    //
+    // Note what this guard is NOT: 0 was already refused (`!variant`), so the code was never
+    // actually asking anyone for variant 0. The sentinel documents the distinction and keeps
+    // it, rather than fixing a live bug -- the boss-loot refusal was already holding.
+    if (!g_enabled || !variant || variant == kNoVariant) return false;
     const uint64_t now = now_ms();
     const char* why = nullptr;
     float pos[3] = {};

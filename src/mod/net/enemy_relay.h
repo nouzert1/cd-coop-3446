@@ -26,6 +26,7 @@ inline bool is_valid_enemy_copy_key(uint32_t key) {
     return is_enemy_copy_key(key) && (key & 0xFFFFu) >= 1 && (key & 0xFFFFu) <= kEnemyCopyMaxNetId;
 }
 
+
 // ---- sending side (sniffer writer thread: everything the client sees)
 void enemy_observe_s2c(const uint8_t* packet, size_t size);
 void enemy_observe_c2s(const uint8_t* packet, size_t size);

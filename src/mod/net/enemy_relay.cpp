@@ -190,8 +190,9 @@ bool valid_size(uint16_t op, size_t n) {
 }
 
 std::atomic<bool> g_receive_enabled{false};
+// kNoVariant is declared in enemy_relay.h: loot_twin enforces it too.
 std::map<uint32_t, bool> g_copies;          // copy keys loaded here
-std::map<uint32_t, uint32_t> g_copy_variant;  // copy key -> its enemy variant (load +0x18), for loot_twin
+std::map<uint32_t, uint32_t> g_copy_variant;  // copy key -> its enemy variant (load +0x18), or kNoVariant
 std::map<uint32_t, uint64_t> g_report_due;  // copy key -> when to log where it is
 
 uint64_t now_ms() { return GetTickCount64(); }
@@ -1296,7 +1297,13 @@ void watch_hidden() {
     {
         std::lock_guard lock(g_mutex);
         for (const auto& [key, load] : g_loads) {
-            if (load.size() > 3 && load[2] == 3) keys.push_back(key);
+            // The same predicate the copy path uses, not a bare `== 3`. This is the fourth site
+            // that carried that filter; round 30 widened the other three and missed this one,
+            // so a type-4 boss would never have entered this watch -- its hidden-flag
+            // transitions would go unreported while every other enemy's were logged.
+            if (load.size() > 3 && is_relayable_record_type(load[2], boss_is_boss(key))) {
+                keys.push_back(key);
+            }
         }
         for (const auto& [key, copy] : g_sent) with_copy.insert(key);
     }
@@ -1723,7 +1730,31 @@ void load_copy(WaitingCopy& w) {
         if (log_turn(g_refused_logged)) log::warn("Enemy relay: copy 0x{:08X} refused: {}", w.copy, why);
         return;
     }
-    const uint32_t variant = load.size() > 0x1C && load[2] == 3 ? u32_at(load.data() + 0x18) : 0;
+    // The variant only means anything for a type-3 load. For any other type the +0x18 field is
+    // a different field, so reading it as a variant would produce a NUMBER THAT IS NOT A
+    // VARIANT -- and 0 is the dangerous one, not a harmless default.
+    //
+    // This is not theoretical. loot_on_copy_died hands the variant to is_excluded_variant,
+    // whose whole job is to refuse boss and unique loot (JEFES-POR-QUE-NAO-FECHA.md section 1,
+    // loot_twin.cpp:224). Zero is NOT in kExcludedVariants, so that guard would return false
+    // and the guest's server would be asked for variant 0 -- an actor that does not exist, the
+    // orphan-actor risk botin-invitado.md section 7 rates as medium. The boss-loot refusal
+    // that the design documents as "blocked on purpose" would have been blocking nothing.
+    //
+    // Before type 4 became relayable this could not happen: only type-3 loads were ever
+    // copied, so load[2] was always 3 and the real variant was always read. Widening the
+    // predicate in round 30 opened this path and left this line behind.
+    //
+    // kNoVariant is a SENTINEL, not a variant. loot_twin refuses on it explicitly instead of
+    // relying on a table lookup that cannot know about it, so the refusal does not depend on
+    // the layout of a record type whose fields have never been measured.
+    const bool type3 = load.size() > 0x1C && load[2] == 3;
+    const uint32_t variant = type3 ? u32_at(load.data() + 0x18) : kNoVariant;
+    if (!type3 && log_turn(g_refused_logged)) {
+        log::info("Enemy relay: copy 0x{:08X} is record type {} (not 3): no variant field to read, "
+                  "so no loot twin will be requested for it",
+                  w.copy, load.size() > 3 ? load[2] : 0);
+    }
     if (!puppet_spawn_enemy(w.copy, std::move(load), std::move(action))) return;
     g_copies[w.copy] = true;
     g_copy_variant[w.copy] = variant;
@@ -1992,7 +2023,10 @@ void enemy_on_state(const std::vector<uint8_t>& bytes, uint64_t delay_ms) {
         // Its loot is the other player's, unless we helped kill it: then our
         // server's twin of it gives us ours (loot_twin.h).
         const auto v = g_copy_variant.find(copy);
-        const bool twin = loot_on_copy_died(copy, v != g_copy_variant.end() ? v->second : 0, delay_ms);
+        // A copy with no recorded variant is not necessarily variant 0: it may be a record type
+        // that has no variant field at all. kNoVariant says which, so loot_twin's refusal does
+        // not rest on a table that cannot tell the two apart.
+        const bool twin = loot_on_copy_died(copy, v != g_copy_variant.end() ? v->second : kNoVariant, delay_ms);
         if (const uint32_t own = capture_own_player_key(); own && !twin) {
             Bytes empty(5);
             empty[0] = 4;

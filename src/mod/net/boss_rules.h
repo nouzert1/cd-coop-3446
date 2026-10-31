@@ -97,4 +97,18 @@ inline bool is_relayable_record_type(uint32_t type, bool is_boss) {
     return false;
 }
 
+// A copy whose load was not record type 3 has no variant field, so there is nothing to read at
+// +0x18 and no loot twin can be asked for. This sentinel carries that fact to loot_twin, which
+// refuses on it BY NAME (loot_twin.cpp) rather than leaving the distinction to a table lookup
+// is_excluded_variant has never heard of -- 0 does not appear in kExcludedVariants.
+//
+// It lives in this header, not in enemy_relay.cpp, for two reasons: both modules act on it (the
+// relay decides it, loot_twin enforces it), and this header is the one the unit tests can
+// include -- it has no game or Windows dependency, so the sentinel is testable.
+//
+// 0 would have been the obvious choice and is the wrong one: loot_on_copy_died already treats 0
+// as "no variant", so a real variant of 0 and an absent variant would be indistinguishable.
+// No variant the game uses comes close to this value.
+inline constexpr uint32_t kNoVariant = 0xFFFFFFFFu;
+
 }  // namespace cdmp::net
