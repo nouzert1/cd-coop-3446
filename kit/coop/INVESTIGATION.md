@@ -1,5 +1,10 @@
 # INVESTIGATION.md — why the host crashes when the other player's character spawns
 
+**BUILD NOTICE.** This document describes a crash observed on game build **1.0.0.3446**, and
+every address in it belongs to that build. The kit has since moved to **1.0.0.3460** and the
+game has been re-ported. **Do not use any address below on 1.0.0.3460** — re-measure it first.
+What still transfers is the method, the failure modes, and the three traps in Section 4.
+
 For an AI coding agent doing reverse-engineering work. This is a **research task**, not an
 install task. `INSTALL.md` covers installation.
 
@@ -35,8 +40,10 @@ Additional rules, each one from a crash that already happened:
 
 ## 1. The symptom, exactly
 
-Game build **1.0.0.3446**. Both players on mod build `{{BUILD_ID}}`, verified identical by
-hash, so this is **not** a version mismatch.
+Game build **1.0.0.3446** — that is the build this crash was observed on, and every address
+in this document refers to it. The kit now ships for **1.0.0.3460**, so if you are reading
+this to fix a crash on 3460, re-measure before trusting any address below. Both players were
+on mod build `{{BUILD_ID}}`, verified identical, so this is **not** a version mismatch.
 
 The guest joins. Position exchange works. Then, the instant the guest's character is
 spawned into the host's world, **the host's game exits with no error dialog.**

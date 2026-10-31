@@ -14,7 +14,7 @@ verification steps.
 | Item | Value |
 |---|---|
 | Game | Crimson Desert, PC, Steam |
-| Required game build | **1.0.0.3446** (PE timestamp `0x6AE46DD0`) |
+| Required game build | **1.0.0.3460** (PE timestamp `0x6AE58024`) |
 | Mod binary | `cdmp.asi` (x64, C++20, GPL v3) |
 | ASI loader | `dinput8.dll` in this kit — **must be renamed to `winmm.dll`** |
 | This build id | `{{BUILD_ID}}` |
@@ -23,7 +23,7 @@ verification steps.
 | Log the mod writes | `<game>\bin64\cdmp.log` |
 | Save folder | `%LOCALAPPDATA%\Pearl Abyss\CD\save` |
 
-Every address in this build is valid **only** for game build 1.0.0.3446. On any other
+Every address in this build is valid **only** for game build 1.0.0.3460. On any other
 build the mod refuses to install itself, on purpose, and writes the reason to `cdmp.log`.
 It will not crash and will not touch the save.
 
@@ -66,7 +66,7 @@ in Steam, right-click Crimson Desert > Manage > Browse local files, then open `b
 (Get-Item "$game\CrimsonDesert.exe").VersionInfo.FileVersion
 ```
 
-It must report `1.0.0.3446`. If it does not, **stop** and tell the user: the mod does not
+It must report `1.0.0.3460`. If it does not, **stop** and tell the user: the mod does not
 support their build, and running it would do nothing. All offsets are build-specific.
 
 ---
@@ -157,7 +157,7 @@ If `cdmp.log` does not exist at all, the mod did not load. The usual causes, in 
 
 1. `dinput8.dll` was copied without being renamed to `winmm.dll`.
 2. Another DLL already occupied `winmm.dll` (Step 2 should have caught this).
-3. The game build is not 1.0.0.3446 — the mod logs the refusal.
+3. The game build is not 1.0.0.3460 — the mod logs the refusal.
 
 The in-game overlay also proves it loaded: a panel in the top-left corner, toggled with
 **F8**.

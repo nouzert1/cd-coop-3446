@@ -690,6 +690,28 @@ $lines | Set-Content -Path (Join-Path $kit 'SHA256SUMS.txt') -Encoding ASCII
 VOCE E O CONVIDADO (QUEM VAI VISITAR O MUNDO DO AMIGO).
 
 ----------------------------------------------------------
+PASSO 0 - CONFERIR A VERSAO DO JOGO (FACA ISTO PRIMEIRO)
+----------------------------------------------------------
+
+  Este mod so' funciona na versao EXATA do jogo:
+
+       1.0.0.3460
+
+  Para conferir: botao direito no CrimsonDesert.exe >
+  Propriedades > Detalhes > "Versao do arquivo".
+
+  Se estiver diferente, PARE e me avise -- o mod nao
+  funciona e nao tem como adivinhar por que.
+
+  Isto nao e' teoria: o jogo se atualizou sozinho DUAS VEZES
+  durante este projeto (3424 -> 3446 -> 3460). Nas duas vezes
+  o mod parou de ler o jogo, sem crash e sem estragar o save.
+
+  No Steam, coloque em: botao direito em Crimson Desert >
+  Propriedades > Atualizacoes > "So atualizar quando eu
+  iniciar o jogo". Assim voce ve antes de quebrar.
+
+----------------------------------------------------------
 PASSO 1 - BACKUP DO SEU SAVE (1 MINUTO, FACA ISSO)
 ----------------------------------------------------------
 
@@ -853,8 +875,38 @@ MENSAGENS QUE VOCE PODE VER
      arquivo deste mesmo ZIP. Os DOIS precisam usar este ZIP.
 
   "Camera: camera block sentinel mismatch"
-     Inofensivo. Diagnostico que o patch do jogo moveu de
-     lugar. Custa so o nome flutuante na tela.
+     ESPERADO neste build, e NAO e' inofensivo como era
+     antes -- veja "o que nao funciona" abaixo. E' o mod
+     avisando que a camera do convidado nao foi recuperada
+     no patch 1.0.0.3460. Nao tente consertar, e' conhecido.
+
+  "check vs game global n/a"
+     ESPERADO. E' o autocontrole do mod se abstendo porque
+     o segundo endereco de posicao do jogo mudou de
+     conteudo neste build. Abster-se e' correto; o que
+     seria errado e' aparecer um numero tipo "21849.89 m".
+
+----------------------------------------------------------
+O QUE NAO FOI RECUPERADO NESTE BUILD (honesto)
+----------------------------------------------------------
+
+  O jogo se atualizou sozinho de 1.0.0.3446 para 1.0.0.3460
+  no meio do projeto, e tres coisas NAO voltaram, porque os
+  objetos que elas usavam sairam da regiao de dados onde
+  ficavam. Nao e' um endereco deslocado a corrigir.
+
+    - camera do convidado: o boneco remoto aparece SEM
+      rotacao (parado de frente, sempre)
+    - sincronia de tempo entre voces: sem efeito visivel
+    - icone do amigo no minimapa: simplesmente nao aparece
+
+  Os tres DESLIGAM SOZINHOS quando o endereco esta' errado --
+  nao produzem valor errado. Isto foi medido, nao suposto.
+
+  O que FUNCIONA e o que este teste mede: posicao, vida,
+  stamina, rotacao do ator, e todo o caminho de rede.
+
+  Ver docs/research/globais-3460.md para as medicoes.
 
 ----------------------------------------------------------
 RESUMO
