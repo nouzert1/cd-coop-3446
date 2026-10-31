@@ -129,6 +129,11 @@ damage=0
 "@
     [IO.File]::WriteAllText((Join-Path $dir 'cdmp.ini'), $ini, [Text.Encoding]::Unicode)
     $Readme | Set-Content (Join-Path $dir 'LEIA-PRIMEIRO.md') -Encoding UTF8
+    # The step-by-step guide, kept separate from LEIA-PRIMEIRO (which explains the test).
+    # This one exists because the player's assistant is asked to "install the host kit" and
+    # needs an unambiguous procedure with the hashes to verify against.
+    $guide = Join-Path $PSScriptRoot "..\kit\guia-$Name.md"
+    if (Test-Path $guide) { Copy-Item $guide (Join-Path $dir 'COMO-INSTALAR.md') -Force }
     Add-Content (Join-Path $dir 'SHA256SUMS.txt') -Encoding UTF8 -Value @"
 $asiHash  cdmp.asi
 $loaderHash  dinput8.dll
