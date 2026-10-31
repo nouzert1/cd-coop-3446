@@ -20,3 +20,8 @@ dist/
 captures/
 cdmp_packets_*
 cdmp_learnt.txt
+
+# dumps de travamento: sao enormes (12+ GB) e sao evidencia local, nao fonte
+hang-dumps/
+*.dmp
+

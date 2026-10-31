@@ -81,8 +81,6 @@ using build_3424::kLoadingParkRadius;
 using build_3424::kMaxStatEntries;
 using build_3424::kMethod_Actor;
 using build_3424::kMinimapIconCompanion;
-using build_3424::kMinimapIconDecide;
-using build_3424::kMinimapIconDecideHead;
 using build_3424::kMinimapIconOutlinedArrow;
 using build_3424::kMinimapIconPlayerArrow;
 using build_3424::kMoveController_Method;
@@ -271,6 +269,31 @@ inline constexpr uintptr_t kTrocInstancesEnd = 0x6EB6378;    // 3424:0x6EC8540, 
 // gap is doing real work here, not rounding.
 inline constexpr uintptr_t kMinimapIconRoot = 0x71B1DD8;     // = kWorldSystemSlot + 0x398
 inline constexpr uintptr_t kMinimapIconRootAlt = 0x71B1DE0;  // = kWorldSystemSlot + 0x3A0
+
+// ---- the minimap icon decision function -----------------------------------
+// MEASURED on 3446, and it corrects a long-standing mistake in how this site was
+// recorded. The 3424 value 0x9E89C0 is NOT the start of the function -- it is a
+// MID-HOOK, +0x6ED into a body that begins at 0x9E82D0. The 16 bytes stored as
+// kMinimapIconDecideHead were therefore never that function's prologue; they are
+// the prologue of some other function, which is why the offline guard could never
+// match them and why this site appeared permanently "unresolvable". It was being
+// compared against the wrong thing.
+//
+// Found by diffing the two builds, the method that resolved kCcPost and kPending:
+//   * the interior sequence `lea rcx,[rsp+0x60] / call / cmp byte ptr [rsp+0x48],0`
+//     occurs EXACTLY ONCE in the 3446 image, at exe+0x9E8A73;
+//   * the site is that +0x0A = exe+0x9E8A7D, and the instructions after it line up
+//     one for one with 3424, including the global it loads (3446 0x713C7D0 against
+//     3424 0x71397E0, a delta of 0x2FF0 -- the struct-relative gap above, NOT the
+//     flat shift the other globals took, so this is corroboration not coincidence);
+//   * the internal offset is IDENTICAL in both builds: 0x9E82D0 + 0x6ED = 0x9E89BD
+//     and 0x9E8390 + 0x6ED = 0x9E8A7D.
+//
+// The hook is installed at the site, not at the function entry, so the address the
+// mod uses is the site. The head is re-recorded from the real bytes at the site.
+inline constexpr uintptr_t kMinimapIconDecide = 0x9E8A7D;  // 3424:0x9E89BD (mid-hook; body at 0x9E8390)
+inline constexpr uint8_t kMinimapIconDecideHead[] = {0x80, 0x7C, 0x24, 0x48, 0x00, 0x75, 0x6F, 0x8B,
+                                                     0x05, 0x46, 0x3D, 0x75, 0x06, 0x41, 0x89, 0x06};
 
 // Same reasoning: kWorldSystemSlot + 0x2A8, the gap both older builds used,
 // confirmed to have code referencing it.
