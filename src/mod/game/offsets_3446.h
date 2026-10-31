@@ -119,11 +119,8 @@ using build_3424::kRemoteCatchSceneId;
 using build_3424::kRideEnterHead;
 using build_3424::kRideOffEnter;
 using build_3424::kRideOnEnter;
-using build_3424::kServerActor_Key;
-using build_3424::kServerDockingWriter;
+using build_3424::kServerActor_Key;using build_3424::kServerDockingWriter;
 using build_3424::kServerDockingWriterHead;
-using build_3424::kServerOtherEquipWriter;
-using build_3424::kServerOtherEquipWriterHead;
 using build_3424::kStatContainer_Count;
 using build_3424::kStatContainer_Entries;
 using build_3424::kStatEntry_Current;
@@ -298,6 +295,41 @@ inline constexpr uint8_t kMinimapIconDecideHead[] = {0x80, 0x7C, 0x24, 0x48, 0x0
 // Same reasoning: kWorldSystemSlot + 0x2A8, the gap both older builds used,
 // confirmed to have code referencing it.
 inline constexpr uintptr_t kClientClockBias = 0x71B1CE8;  // = kWorldSystemSlot + 0x2A8
+
+// ---- server-side writer of OtherEquipItemAck ------------------------------
+// MEASURED on 3446, and it exposed a defect that had been sitting in the 3424 value
+// the whole time: the address was off by ONE BYTE.
+//
+//   3424 recorded 0x29ED1F0 -> 02 48 8B 84 24 E0 10 00 00 ...
+//   3424 actually  0x29ED1F1 -> 48 8B 84 24 E0 10 00 00 48 8B 10 48 85 D2 74 0A
+//
+// 0x29ED1F0 lands in the MIDDLE of the `mov rax,[rsp+0x10E0]` instruction, so the 16
+// bytes compared against `kServerOtherEquipWriterHead` began with a stray 02 and could
+// never equal the recorded head. The head itself was written from the same wrong place,
+// so the comparison was consistent with itself and the mistake was invisible: the guard
+// in local_capture.cpp compares the live bytes against the stored head, both of which
+// came from the misaligned address. The only way it could have shown up is on a build
+// where that byte happened to differ, which is what 3446 is.
+//
+// A mid-hook address must be the START of an instruction. safetyhook does not repair a
+// misaligned site; it hooks where it is told, so a one-byte error would have made the
+// hook fire mid-instruction and copy garbage from rcx/r8/r9 through copy_equip_args.
+// That this never bit on 3424 is luck, not design.
+//
+// Found by diffing the two builds, as with kCcPost and kPending:
+//   * the function entry is identifiable by its prologue and its large frame --
+//     `mov [rsp+8],rbx / mov [rsp+0x18],r8b / push rdi / mov eax,0x1060` -- and that
+//     prologue is byte-identical in both builds, so only the START address moved;
+//   * 3424 entry 0x29ED140 and 3446 entry 0x29EDC60 put the site at the SAME internal
+//     offset, +0xB1, which is what makes this a measurement rather than a guess;
+//   * the 16 bytes at the 3446 site are byte-for-byte equal to the 3424 site's.
+//
+// The `mov [rsp+0x18],r8b` in the prologue is independent corroboration that the hook's
+// arguments are where on_equip_writer thinks they are: it reads ctx.r8, and r8b is
+// stored by the callee's own prologue.
+inline constexpr uintptr_t kServerOtherEquipWriter = 0x29EDD11;  // 3424:0x29ED1F1 (was 0x29ED1F0, one byte early)
+inline constexpr uint8_t kServerOtherEquipWriterHead[] = {0x48, 0x8B, 0x84, 0x24, 0xE0, 0x10, 0x00, 0x00,
+                                                          0x48, 0x8B, 0x10, 0x48, 0x85, 0xD2, 0x74, 0x0A};
 
 // ---- code the co-op path cannot work without ------------------------------
 // Both re-found on 3446 by scanning for their prologues; both matched as the

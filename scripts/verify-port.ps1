@@ -509,7 +509,7 @@ code_addrs = [
     ('kClientOnRecvPacket      (capture: receives)', 0x3A5940, 'kClientOnRecvPacketHead',     True),
     ('kClientClock             (time sync)',        0x1416B80, 'kClientClockHead',            False),
     ('kMinimapIconDecide       (minimap icon)',     0x9E8A7D,  'kMinimapIconDecideHead',      True),
-    ('kServerOtherEquipWriter  (equip relay)',      0x29ED1F0, 'kServerOtherEquipWriterHead', False),
+    ('kServerOtherEquipWriter  (equip relay)',      0x29EDD11, 'kServerOtherEquipWriterHead', True),
 ]
 for label, rva, hname, must_match in code_addrs:
     sig = head_bytes(hname)
@@ -546,21 +546,24 @@ def find_all(sig):
     return out
 
 guards = [
-    ('kServerOtherEquipWriter', 0x29ED1F0, bytes([0x48,0x89,0x5C,0x24,0x08,0x4C,0x89,0x4C])),
     ('kClientClock', 0x1416B80, bytes([0x80,0x3D,0xAE,0x61,0x87,0x05,0x00,0x75,0x17])),
 ]
-# kMinimapIconDecide used to sit in this list and no longer does, because it was never
-# unresolvable -- it was recorded wrong. 0x9E89C0 is a MID-HOOK, +0x6ED into a body at
-# 0x9E82D0, so the head bytes stored for it belonged to a different function and could
-# never match at that address on any build. It is now measured at 0x9E8A7D and asserted
-# by the code_addrs loop above. If a site in this list ever starts matching at its old
-# rva, that is still the signal described below -- but before assuming a site is
-# unresolvable, check whether it is a function entry or a mid-hook.
-# These two were resolved on 2976 and cannot be re-resolved offline for
-# 3424. On 3424 they are EXPECTED not to match, and each feature then disables
+# kServerOtherEquipWriter used to sit in this list and no longer does. Like
+# kMinimapIconDecide it was never unresolvable -- it was recorded one byte early, at
+# 0x29ED1F0, which lands in the middle of a `mov rax,[rsp+0x10E0]`. The head array was
+# written from the same wrong address, so the live-vs-stored comparison agreed with
+# itself and the error stayed invisible. It is measured now at 0x29EDD11 and asserted by
+# the code_addrs loop above.
+#
+# The general lesson, now seen three times in this port (kCcPost, kPending,
+# kMinimapIconDecide, and now this): before concluding a site is unresolvable, check
+# whether the recorded address is a function entry, a mid-hook, or simply misaligned. A
+# mid-hook address must be the START of an instruction.
+# kClientClock was resolved on 2976 and cannot be re-resolved offline for
+# 3424. On 3424 it is EXPECTED not to match, and its feature then disables
 # itself instead of reading the wrong address. So "no match" is the correct
 # result here and must NOT be counted as a failure -- but the check is asserted
-# anyway, because the interesting event is the opposite one: if a site starts
+# anyway, because the interesting event is the opposite one: if the site starts
 # matching again, the signature is not where it was thought to be and the guard
 # is now protecting something else.
 print('  (on this build these are expected NOT to match: the feature disables itself)')
