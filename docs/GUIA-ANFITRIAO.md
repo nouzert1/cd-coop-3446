@@ -91,6 +91,11 @@ Você não tem o carregador nem a configuração. Então:
 3. Para o `cdmp.ini`, use o perfil de **anfitrião**, não o do zip (o do zip é `role=guest`).
    No repositório ele está em `kit\coop\cdmp.ini.anfitrion` — copie como `cdmp.ini`.
 
+> **Por que renomear:** o `dinput8.dll` é o Ultimate ASI Loader, que funciona sequestrando uma DLL
+> que o jogo **importa**. Medido no import table de `CrimsonDesert.exe`: ele importa **`WINMM.dll`**
+> e **não** importa `DINPUT8.dll`. Com o nome errado o arquivo fica parado na pasta e nunca carrega —
+> sem painel, sem `cdmp.log`, sem nada.
+
 > ⚠️ **Se você pular o passo 3**, o script avisa:
 > `nao ha cdmp.ini ... o padrao de [coop] enabled e 0, entao o co-op nao liga sozinho`.
 > É exatamente o sintoma de "conecta mas não aparece nada".
@@ -103,7 +108,7 @@ Na pasta `bin64` do jogo devem existir:
 |---|---|
 | `cdmp.asi` | o mod |
 | `cdmp.ini` | perfil **host** |
-| `winmm.dll` | o carregador (pode ter vindo como `dinput8.dll`, renomeado) |
+| `winmm.dll` | o carregador (veio como `dinput8.dll`, renomeado) |
 
 O `cdmp.ini` do anfitrião precisa ter:
 

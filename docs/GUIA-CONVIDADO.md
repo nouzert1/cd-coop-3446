@@ -53,7 +53,7 @@ Você recebeu um arquivo `.zip`. Dentro dele tem:
 |---|---|
 | `cdmp.asi` | o mod |
 | `cdmp.ini` | a configuração — **já vem pronta, não mexa** |
-| `dinput8.dll` | o carregador (vai ser renomeado) |
+| `dinput8.dll` | o carregador (Ultimate ASI Loader) — **renomeie para `winmm.dll`** |
 | `COMECE-AQUI-PORTUGUES.txt` | este guia |
 | `SHA256SUMS.txt` | conferência de integridade |
 
@@ -78,7 +78,7 @@ cdmp.ini
 dinput8.dll
 ```
 
-### 2.3 RENOMEIE o `dinput8.dll`
+### 2.3 RENOMEIE o `dinput8.dll` para `winmm.dll`
 
 Depois de copiar, dentro de `bin64`:
 
@@ -86,11 +86,24 @@ Depois de copiar, dentro de `bin64`:
 dinput8.dll   →   RENOMEIE PARA   winmm.dll
 ```
 
-**Este passo é obrigatório.** O jogo só carrega o mod através de um arquivo chamado `winmm.dll`.
-Se ficar `dinput8.dll`, nada acontece e você não vê painel nenhum.
+**Este passo é obrigatório e tem uma razão técnica medida:**
 
-> ⚠️ **Se a pasta `bin64` já tiver um `winmm.dll`**, **PARE** e avise o anfitrião. Pode ser de outro
-> mod, e sobrescrever quebra os dois.
+O `dinput8.dll` do zip é o **Ultimate ASI Loader**. Ele é um *sequestro* de DLL: o Windows só o
+carrega se o jogo **importar** aquele nome. E o `CrimsonDesert.exe`:
+
+| Importa | Resultado se você usar esse nome |
+|---|---|
+| `WINMM.dll` | ✅ **carrega** — é o nome certo |
+| `DINPUT8.dll` | ❌ **nunca carrega** — fica parado na pasta, sem fazer nada |
+
+Verificado no import table do executável. É por isso que o nome **tem** que ser `winmm.dll`.
+
+> ⚠️ **Se aparecer `Ponto de entrada não encontrado: waveInStart`** ao clicar em Jogar, o arquivo
+> está **corrompido** (download incompleto). O ASI Loader 9.7.4 **exporta** `waveInStart`
+> (confirme o SHA256 abaixo). Extraia o zip de novo — não copie de dentro dele.
+
+> ⚠️ **Se a pasta `bin64` já tiver um `winmm.dll`** de outro mod, pare e avise: sobrescrever quebra
+> os dois.
 
 ### 2.4 Não edite o `cdmp.ini`
 
@@ -194,6 +207,8 @@ Suas próprias missões e seu XP **não são afetados** por nada disso. Você es
 | `Different mod versions` | Os `cdmp.asi` são diferentes | **Os dois precisam usar o MESMO zip** |
 | Nenhum painel | O mod não carregou | Você renomeou para `winmm.dll`? Os 3 arquivos estão em `bin64`? |
 | `Game reader DISABLED: unsupported game build` | A versão do jogo mudou | Avise o anfitrião |
+| Nenhum painel **e nenhum arquivo `cdmp.log`** | O `dinput8.dll` não foi renomeado para `winmm.dll` | Renomeie. O jogo não importa `dinput8.dll`, então ele nunca carrega |
+| **"Ponto de entrada não encontrado: `waveInStart`"** | O arquivo está corrompido (download incompleto) | Extraia o zip de novo; confira o SHA256 |
 
 ---
 
@@ -244,7 +259,7 @@ não contou. Combine com o anfitrião: *"agora!"* — os dois apertam juntos.
 3. Ser amigo do anfitrião na Steam
 4. Fechar o jogo
 5. Copiar 3 arquivos para bin64   (cdmp.asi, cdmp.ini, dinput8.dll)
-6. RENOMEAR dinput8.dll -> winmm.dll
+6. RENOMEAR dinput8.dll -> winmm.dll   (obrigatorio)
 7. Não editar o cdmp.ini (já vem pronto, role=guest)
 8. Esperar o anfitrião abrir, depois abrir, ir ao mesmo lugar, F8, olhar
 ```
