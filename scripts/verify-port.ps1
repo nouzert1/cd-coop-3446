@@ -366,6 +366,26 @@ _referenced = [
     ('kTrocInstancesEnd',   0x6EB6378, False),
     ('kFieldTimeClient',    0x6EB2AD8, False),
 ]
+
+# ---- vtables, checked against the RTTI the binary carries -------------------
+# A vtable is checkable offline in a way a .bss global is not, and the check is much
+# stronger than "the bytes look like pointers". The x64 RTTI layout puts a
+# CompleteObjectLocator immediately before the vtable, and the COL names the class. So
+# instead of trusting a recorded address, find the class by NAME in the type descriptors
+# and take the vtable the binary actually attaches to it.
+#
+# This is how kVtWallUpMovementMethod was caught: the class has RTTI in both builds, the
+# RTTI names a vtable, and that vtable was not the address the mod was using. The recorded
+# 0x55968B8 is a different table entirely -- its slots are unrelated functions and the
+# qword before it does not dereference to a plausible COL. See the note in offsets_3446.h.
+#
+# kVtPhysicsObject and kVtCamera are absent on purpose: they are 0 on both builds, which
+# the readers interpret as "skip the check", so there is no address to verify.
+vt_expect = [
+    # class name (RTTI string), expected rva, note
+    ('WallUpMovementMethod', 0x5918F78, 'has_vtable guard in read_player_wallup'),
+]
+
 # Shapes that reach data RIP-relatively on x64. (opcode, has own modrm, disp at, len)
 _ref_shapes = [
     (b'\x48\x8B', False, 3, 7),   # mov r64,[rip+d]
@@ -598,6 +618,159 @@ for name, rva, sig in containment:
     here = (d[off:off+len(sig)] == sig) if off else False
     ok('containment site %s matches at exe+0x%X' % (name, rva), here,
        'no match at that rva' if not here else '')
+print()
+print()
+print('== vtables, located through the RTTI the binary carries ==')
+# Find the class by NAME in the type descriptors, then resolve the CompleteObjectLocator
+# to the vtable the binary attaches to it, and compare with the address the mod uses.
+#
+# This is a genuinely independent check: nothing here reads offsets.h. The class name is
+# a string in the image and the vtable is found by following the RTTI chain, so an
+# address that is merely "a plausible-looking table of code pointers" cannot pass.
+#
+# The RTTI chain on x64 MSVC: vtable-8 -> &CompleteObjectLocator; COL+0x0C holds a signed
+# offset from the COL's own address to its TypeDescriptor; the descriptor is
+# `vftable` (u16 signature 0) | u16 skip | char name[].
+def _find_vtables(want):
+    """All vtables whose RTTI type name contains `want`. Returns list of rvas.
+
+    Walking the whole image looking for CompleteObjectLocators is far too slow (the image
+    is 320 MB and a COL is only recognisable by its signature byte). So this goes the
+    other way round: find the type-descriptor STRING, read the descriptor's rva, then look
+    for the vtable by its own convention -- the qword immediately before a vtable is the
+    COL, and that COL points back at this descriptor.
+
+    Concretely, for a candidate vtable rva V: COL = *(V-8) as an rva, and
+    COL + 4 + 0x0C + int32@(COL+0x0C) must equal the descriptor rva. Scanning candidate
+    V values from the pointers we already trust keeps this to a handful of probes.
+    """
+    out = []
+    needle = b'.?AV' + want.encode('ascii')
+    td_offs = []
+    start = 0
+    while True:
+        i = d.find(needle, start)
+        if i < 0:
+            break
+        td_offs.append(i)
+        start = i + 1
+    if not td_offs:
+        return out
+    # The name begins at the descriptor's char[] member. The layout measured in this
+    # image is: `00 00 00 00` (signature u16 = 0, skip u16 = 0), then the mangled name,
+    # so the descriptor starts 20 bytes before the '.?AV'. The name is what we searched
+    # for, and its offset is 20 bytes past the descriptor's rva. Rather than rely on that
+    # constant, accept a small window -- but the window must be right, because getting it
+    # wrong makes the COL back-reference never match and the class look absent, which is
+    # exactly the failure this check is supposed to detect. It did detect it, on itself.
+    td_rvas = []
+    for off in td_offs:
+        for back in range(4, 41, 4):
+            r = _off_to_rva(off - back)
+            if r is not None:
+                td_rvas.append(r)
+    # Candidate vtables: every 8-byte slot in a read/write data section that is a
+    # plausible rva AND whose preceding qword is a plausible rva. That is still a big
+    # set, so instead reuse the fact that a vtable's slots point into an EXEC section.
+    exec_ranges = [(va, va + vs) for (nm, va, vs, ro, rs) in secs if va in exec_secs]
+    def is_code_rva(r):
+        """Does this rva look like an address inside executable code?
+
+        Accepts an rva. Callers pass rvas: the absolute-to-rva conversion for pointers
+        stored in the image happens at the call site, not here, so that the two
+        conventions are not mixed.
+        """
+        return any(a <= r < b for (a, b) in exec_ranges)
+    def slot_rva(v):
+        """A pointer stored in the image, as an rva.
+
+        MSVC stores these as preferred-base absolute addresses -- the vtable slots read
+        0x140773910 while the code they point at is at rva 0x773910. Comparing the raw
+        absolute value against rva ranges finds no code anywhere, so every candidate is
+        rejected and the result is "class not found" for a class that is plainly present.
+        This is the same absolute-vs-rva trap as the CompleteObjectLocator pointer:
+        both had to be rebased, and each one alone was enough to hide the vtable.
+        Values that are already small are left alone, so a table stored as rvas still
+        works.
+        """
+        return v - imgbase if v >= imgbase else v
+    # Scan EVERY section that has bytes in the file, not just the writable ones. The
+    # first version of this restricted itself to read/write data sections and found
+    # nothing, because the vtables in this image live in `.edata`, which is read-only.
+    # Restricting by permission was a reasonable-looking guess and it was simply wrong;
+    # the section names here are decoys too, so they cannot be used either. What a
+    # vtable actually needs is: bytes in the file, and slots that point at code.
+    for (nm, va, vs, ro, rs) in secs:
+        if not ro or not rs:
+            continue
+        if va in exec_secs:
+            continue  # code, not tables
+        for o in range(ro, min(ro + rs, len(d)) - 16, 8):
+            v = struct.unpack_from('<Q', d, o)[0]
+            if not v:
+                continue
+            if not is_code_rva(slot_rva(v)):
+                continue
+            vt_rva = _off_to_rva(o)
+            if vt_rva is None:
+                continue
+            # The COL pointer is stored as a PREFERRED-BASE ABSOLUTE ADDRESS, not as an
+            # rva: the qword before the vtable reads 0x146180728, which is image base
+            # (0x140000000) + 0x6180728. Reading it as an rva and looking that up finds
+            # nothing, because 0x146180728 is far outside the image -- which is why the
+            # scan found no vtable at all while the arithmetic around it was correct.
+            # Subtracting the image base is what makes it an rva.
+            col_rva_raw = struct.unpack_from('<Q', d, o - 8)[0] if o >= 8 else 0
+            if not col_rva_raw:
+                continue
+            col_rva = col_rva_raw - imgbase if col_rva_raw >= imgbase else col_rva_raw
+            col_off = _rva_to_off(col_rva)
+            if col_off is None or col_off + 0x18 > len(d):
+                continue
+            if struct.unpack_from('<I', d, col_off)[0] != 1:
+                continue
+            # The field at COL+0x0C is the TypeDescriptor's RVA DIRECTLY. It is NOT a
+            # displacement relative to the COL, which is what this check first assumed --
+            # and the wrong assumption is worth recording because of how it failed: the
+            # value read as an int32 is a small number (0x06EE4010), so adding it to the
+            # COL produced an address far below the image, the back-reference never
+            # matched, and every class looked absent. A check that reports "class not
+            # found" for a class that is plainly there is worse than no check, because it
+            # invites the reader to conclude the RTTI is missing rather than to suspect
+            # the reader. Verified against this image: COL 0x6180728 -> +0x0C = 0x6EE4010,
+            # which is exactly where `probe classes` finds .?AVWallUpMovementMethod@pa@@.
+            td_field = struct.unpack_from('<I', d, col_off + 0x0C)[0]
+            if td_field in td_rvas:
+                if vt_rva not in out:
+                    out.append(vt_rva)
+    return out
+
+def _rva_to_off(rva):
+    for (nm, va, vs, ro, rs) in secs:
+        if ro and rs and va <= rva < va + vs:
+            return ro + (rva - va)
+    return None
+
+def _off_to_rva(off):
+    for (nm, va, vs, ro, rs) in secs:
+        if ro and rs and ro <= off < ro + rs:
+            return va + (off - ro)
+    return None
+
+for (cls, want_rva, note) in vt_expect:
+    found = _find_vtables(cls)
+    if not found:
+        ok('%s vtable via RTTI' % cls, False,
+           'class not found by name; cannot confirm %#x (%s)' % (want_rva, note))
+        continue
+    if want_rva in found:
+        ok('%s vtable via RTTI' % cls, True,
+           'exe+%#x is the vtable RTTI attaches to this class' % want_rva)
+    else:
+        ok('%s vtable via RTTI' % cls, False,
+           'exe+%#x is not a %s vtable; RTTI gives %s'
+           % (want_rva, cls, ', '.join('exe+%#x' % v for v in found)))
+
 print()
 print('RESULT: %s' % ('ALL OFFLINE CHECKS PASSED' if fails == 0 else '%d CHECK(S) FAILED' % fails))
 sys.exit(1 if fails else 0)

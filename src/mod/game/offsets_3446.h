@@ -134,7 +134,6 @@ using build_3424::kTroc_Kind;
 using build_3424::kTroc_Opcode;
 using build_3424::kVtCamera;
 using build_3424::kVtPhysicsObject;
-using build_3424::kVtWallUpMovementMethod;
 using build_3424::kWorldSystem_ActorManager;
 
 // ---- build identity -------------------------------------------------------
@@ -227,12 +226,36 @@ inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
 // These three have no RTTI class of that name in this image at all
 // (`probe vtables` answers "Type name not found"), so they cannot be re-resolved
 // and keep their previous values. PhysicsObject and Camera were already 0 on 3424,
-// which reads as "no check"; WallUpMovementMethod is non-zero and belongs to a
-// feature whose consumer fails closed, so a stale value costs that feature and
-// nothing else. Named here so the next person does not have to re-derive why two
-// of the seven vtables are missing from the measured list above.
+// which reads as "no check", so there is nothing to resolve and nothing is lost.
 //   kVtPhysicsObject, kVtCamera                  -> 0 (unchanged, no check)
-//   kVtWallUpMovementMethod = 0x55968B8          -> unverified on 3446
+//
+// ---- kVtWallUpMovementMethod: the old value was never this vtable ----------
+// MEASURED on 3446, and it turned out the 3424 value was not merely stale.
+//
+// The class `.?AVWallUpMovementMethod@pa@@` IS in both binaries with RTTI intact, so
+// `probe vtables` resolves it after all and the note above (that these cannot be
+// re-resolved) was true only for the other two:
+//
+//   WallUpMovementMethod vtable   3424 exe+0x5916EC8   ->   3446 exe+0x5918F78
+//
+// The identity is not taken on faith from the name. The two vtables' slots point at the
+// same member functions with a consistent 0x10 delta across every slot compared --
+// 0x140773920/0x140773910, 0x1406D6D90/0x1406D6D80, 0x1403A2990/0x1403A29D0 and so on
+// for eight slots -- which is the same code shifted, i.e. the same class.
+//
+// The value in use was 0x55968B8, which is NOT that vtable: its slots are a completely
+// different set of functions, and [0x55968B8-8] does not dereference to a plausible
+// CompleteObjectLocator at all (it reads as `sub rsp,0x28` and other code bytes). So the
+// guard `has_vtable(wallup, base + kVtWallUpMovementMethod)` in local_capture.cpp:368
+// has been comparing an object's vtable pointer against an address that is not a vtable
+// of that class -- on 3424 as well as 3446.
+//
+// What that cost, stated precisely: read_player_wallup() returns nullopt whenever the
+// move method is WallUp, so wall-climbing was never relayed between players. It failed
+// closed -- no wrong data, no corruption -- which is exactly why it went unnoticed.
+// Fixing the value is the first time this path can work at all, so it should be treated
+// as untested rather than as a repaired feature.
+inline constexpr uintptr_t kVtWallUpMovementMethod = 0x5918F78;  // 3424:0x5916EC8 (was 0x55968B8, not this vtable)
 
 // ---- Troc handler instances ----------------------------------------------
 // MEASURED by running the mod's own walk against the live game, then bracketed
