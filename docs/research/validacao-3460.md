@@ -134,6 +134,91 @@ O que **deve** funcionar, e ainda não foi tentado:
 
 ---
 
+## ATUALIZAÇÃO: o leitor FUNCIONA no 3460
+
+Depois de re-medir `kWorldSystemSlot`, o mod chegou a ler o jogador:
+
+```
+Game reader enabled (build 1.0.0.3460 offsets)
+Local player: in world
+Local: pos (46234.50, 1000.00, 0.00) rot (0.000, 0.000, 0.000, 1.000)
+       hp 300.0/300.0 stamina 120.0/120.0 | check vs game global 46245.31 m
+```
+
+**`in world`, com vida e stamina corretos.** Isso só passou a acontecer depois que a cadeia
+inteira foi traçada ao vivo, hop por hop, com cada passo validado pelo RTTI do jogo.
+
+### `kWorldSystemSlot = 0x71B5CF0` — medido, não derivado
+
+O valor do 3446 (`0x71B1A40`) lê um `GlobalVariableManager`. Rotas offline falharam todas por
+motivo declarado, então **o mod perguntou ao jogo**: varreu sua própria faixa de dados por um
+slot cujo alvo contém um `ClientActorManager` vivo, e achou **dois** candidatos — `0x71B5CA0`
+e `0x71B5CF0`.
+
+Nenhum se separa offline: **os dois** apontam para um mundo cujo `[+0x30]` é o **mesmo**
+manager vivo, e os dois chegam ao mesmo ator controlado. O teste que os encontrou ("tem um
+ActorManager") não serve para escolher entre eles.
+
+A evidência decisiva é a **posição**. Traçado ao vivo a partir de `0x71B5CF0`:
+
+```
+[0x71B5CF0]              -> world   0x32F61FAE100
+  world  [+0x30]         -> manager 0x32F6E3D4600   RTTI ClientActorManager
+    mgr  [+0x50]         -> actor   0x32F97FED200   RTTI ClientChildOnlyInGameActor
+      actor[+0x60] (u32) -> 0xA0100001              mesma forma 0xA010____ do 3446
+      actor[+0x68]       -> comps   0x32F72F45200
+        comps[+0x40]     -> ctl     0x33019E77D00   RTTI ClientCharacterControlActorComponent
+          ctl  (vtable)  -> 0x14593C8E0            == kVtCharacterControl
+```
+
+Quatro verificações de tipo passaram. Isto é a evidência mais forte disponível aqui, porque
+**não depende de nenhum offset estar certo de memória** — depende só do RTTI do jogo concordar.
+
+**Que existam dois slots de mundo plausíveis é propriedade do jogo, não artefato.** O header do
+3446 já registrava o jogo lendo `0x71B1A38` enquanto `kWorldSystemSlot` era `0x71B1A40`,
+*"both hold valid pointers and both are used"*. Escolher o que parece mais próximo do endereço
+antigo não é método.
+
+### Os offsets de ESTRUTURA sobreviveram — como o header previa
+
+O traço confirmou, de passagem, todo offset de estrutura da cadeia de leitura:
+`kWorldSystem_ActorManager` `0x30`, `kActorManager_ControlledActor` `0x50`,
+`kActor_ComponentTable` `0x68`, `kComponents_CharacterControl` `0x40`, `kControl_Inner` `0x140`.
+A nota de abertura do header dizia que estrutura sobrevive a um patch e endereço não; está certo.
+
+### O que AINDA está errado
+
+**`kControlInner_Physics = 0x2C0`** — ao vivo, `inner[+0x2C0]` contém **ponteiros** (o `dump`
+marca "ptr"), não uma posição. Seguir esse caminho leva a `(1.0, 0.0, 0.1745)`, um vetor
+direção normalizado, que é o tipo de valor que **parece** um resultado mas não é.
+
+A posição real está **inline** em `inner+0x460`:
+
+```
++0x460: (-20717.3516, 620.1661, -6914.6699)   mundo
++0x46C: (        -0.6117,    0.6849,     0.3960)   direção
+```
+
+Floats diretos, não ponteiro. Y=620 é altura e bate com o 613 que apareceu em outro traço.
+
+**`kStaticPlayerPos`** — `check vs game global 46245.31 m` é absurdo, e confirma o que o `dump`
+já mostrava: os bytes em `0x71C0C20` são ponteiros. Lidos como f32 dão `-88.3066`, que **parece**
+uma coordenada. Foi coincidência de bits.
+
+**`kChunkOrigin`** — o mod soma `origin` à posição local. Com `kChunkOrigin = 46234.5` e a
+posição parada em `(46234.50, 1000.00, 0.00)`, o valor lido é suspeito de ser a própria origem
+sendo devolvida, e não uma posição de jogador.
+
+### A lição, de novo
+
+Três valores nesta rodada **pareceram** resultados e não eram: `-88.3066` como posição,
+`0x71B5CA0` como slot, `(1.0, 0.0, 0.1745)` como posição. Nenhum foi rejeitado por ser
+implausível — o primeiro e o terceiro são números perfeitamente formados. Todos foram pegos por
+uma verificação **independente da que os produziu**: o `dump` dos bytes, o RTTI do jogo, ou o
+teste em outro candidato.
+
+---
+
 ## O que este teste NÃO prova
 
 - Nada sobre o co-op em si. O mod não chega a ler o jogador, então nenhum caminho de rede foi
