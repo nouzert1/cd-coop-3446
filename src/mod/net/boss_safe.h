@@ -75,6 +75,21 @@ void boss_reset();
 
 // Is this origin hash a boss stage? False when nothing is known about it, which
 // keeps unknown enemies behaving exactly as before.
+//
+// WARNING: this is a NAMED-STAGE-ONLY check, and names almost never arrive. The only caller
+// that feeds boss_note_spawn_origin in practice is enemy_relay.cpp:337, which strips the spawn
+// identity and has no name to pass -- the mod never reads the game's .pastage files. So this
+// returns false for essentially every real origin, and NOTHING CALLS IT.
+//
+// It was dead code until round 38: boss_note_spawn_origin returned early on an empty name, so
+// g_boss_origins was never populated in any session. The early return is fixed (unnamed
+// origins are now recorded separately, in a set that is NOT a boss verdict), but this function
+// is still the wrong tool for a boss decision -- it can only answer for stages whose names we
+// were told. Use boss_is_boss (HP pool, or the sender's flag on a copy) instead.
+//
+// Kept, not deleted, because the name path is correct and will start answering the moment
+// something supplies real stage names (the CreateFactionSpawnStageAck handler the research
+// points at does not exist yet). A reader who finds it here should not assume it is wired up.
 bool boss_origin_is_boss(uint32_t hash);
 
 // Fallback, from the host: an enemy whose maximum HP is far above any normal

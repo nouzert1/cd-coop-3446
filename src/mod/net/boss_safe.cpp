@@ -28,6 +28,11 @@ std::mutex g_mutex;
 // game hands us. This is game DATA (the .pastage/.paseq names), so it survives a
 // code patch in a way an RVA does not.
 std::unordered_set<uint32_t> g_boss_origins;
+// Spawn-origin hashes that came from a trigger/sequence stage but whose NAME we never saw.
+// Deliberately a separate set from g_boss_origins: sequencer spawns include ordinary quest
+// scenes, so this is not a boss verdict. It exists so the fact is not thrown away -- before,
+// every unnamed origin hit an early return and nothing was kept at all.
+std::unordered_set<uint32_t> g_unnamed_origins;
 // Enemies seen with a boss-sized HP pool, and their current reading for the HUD.
 struct BossInfo {
     std::string name;
@@ -69,8 +74,27 @@ bool boss_cutscene_active() { return g_cutscene; }
 
 void boss_note_spawn_origin(uint32_t hash, const std::string& name) {
     if (hash == 0) return;
-    if (!name_is_boss_stage(name)) return;
+    // The name is usually EMPTY, and that is not a caller error: enemy_relay.cpp:337 strips the
+    // spawn identity on the way out and cannot turn the load's stage hash into a name, because
+    // the mod never reads the game's stage files. So a stage is only nameable when the caller
+    // happens to have the name from somewhere else.
+    //
+    // This used to return early on an empty name, which made the whole path dead: the hash was
+    // never remembered, g_boss_origins stayed empty for the life of every session, and
+    // boss_origin_is_boss was never called from anywhere. boss_rules.h's is_boss_stage_name --
+    // the three boss families, the strongest boss signal the mod has, since the GAME declares
+    // them -- fed nothing but this early return.
+    //
+    // Now the two facts are kept apart. A named boss stage is recorded as before; an UNNAMED
+    // origin is recorded too, as "originated from a trigger/sequence stage". That is weaker
+    // than a name and is NOT by itself a boss verdict -- ordinary quest scenes are sequencer
+    // spawns as well -- so it is stored separately and must not be read as is-a-boss.
     std::lock_guard lock(g_mutex);
+    if (name.empty()) {
+        g_unnamed_origins.insert(hash);
+        return;
+    }
+    if (!name_is_boss_stage(name)) return;
     if (g_boss_origins.insert(hash).second) {
         log::info("Boss: stage '{}' (0x{:08X}) is a boss stage", name, hash);
     }
@@ -79,6 +103,7 @@ void boss_note_spawn_origin(uint32_t hash, const std::string& name) {
 void boss_reset() {
     std::lock_guard lock(g_mutex);
     g_boss_origins.clear();
+    g_unnamed_origins.clear();
     g_bosses.clear();
     g_boss_seen_ms = 0;
 }
