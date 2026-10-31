@@ -605,6 +605,27 @@ $investigation_text = $investigation_text.Replace('{{BUILD_ID}}', $build_id_uppe
 if ($investigation_text -match '\{\{') { throw 'INVESTIGATION.md still has an unstamped placeholder' }
 $investigation_text | Set-Content -Path (Join-Path $kit 'INVESTIGATION.md') -Encoding UTF8
 
+# The hang-diagnosis scripts go in the kits too, because the next real test is the one
+# that has to produce evidence, and the host is the one who has to run them.
+#
+# They matter more than they look. The host's game does not crash, it HANGS - four
+# AppHangTransient events and no APPCRASH, so there is no crash dump and never was. A
+# hang leaves the process alive and stalled, which is a capture window a crash does not
+# offer, and capture-hang.ps1 -Watch uses it: it keeps a complete dump on disk WHILE the
+# game runs so that when the hang comes the evidence is already written.
+#
+# dump-threads.ps1 reads the result. There is no cdb, no windbg and no procdump on this
+# machine, so it walks the MINIDUMP structures directly.
+$diag = Join-Path $kit 'diagnostico'
+New-Item -ItemType Directory -Force -Path $diag | Out-Null
+foreach ($s in 'capture-hang.ps1', 'dump-threads.ps1') {
+    $src = Join-Path $root "scripts\$s"
+    if (-not (Test-Path $src)) { throw "Missing $src" }
+    Copy-Item $src $diag -Force
+}
+if (-not (Test-Path (Join-Path $diag 'capture-hang.ps1'))) { throw 'diagnostico/capture-hang.ps1 is missing' }
+if (-not (Test-Path (Join-Path $diag 'dump-threads.ps1'))) { throw 'diagnostico/dump-threads.ps1 is missing' }
+
 $lines = foreach ($f in 'cdmp.asi', 'dinput8.dll', 'cdmp.ini') {
     $h = (Get-FileHash (Join-Path $kit $f) -Algorithm SHA256).Hash
     '{0}  {1}' -f $h, $f
