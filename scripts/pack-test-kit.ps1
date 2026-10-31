@@ -747,14 +747,33 @@ CONFIRA A VERSAO (a causa mais comum de nao funcionar)
 
   O build TEM QUE SER:  $build_id_upper
 
-  Se aparecer outro numero, voce esta com um ZIP antigo e o
-  co-op NAO funciona: o mod compara a versao ao conectar e
-  RECUSA criar o personagem quando elas diferem. O sintoma e
-  exatamente esse -- voce VE a distancia no painel, porque a
-  troca de posicao funciona, mas nunca ve o boneco.
+  Se aparecer outro numero, voce esta com um ZIP antigo. Nesse
+  caso pare e me avise: os DOIS lados precisam do mesmo ZIP.
+
+  O QUE UM BUILD DIFERENTE FAZ, dito com precisao (este texto
+  ja' afirmou que o mod "RECUSA criar o personagem", e isso e'
+  FALSO -- foi corrigido em 2026-10-31 depois de ler o codigo):
+  ele faz o painel mostrar "Different mod versions: both of you
+  update" e grava um aviso no log. So' isso. check_build()
+  (client_session.cpp:83) escreve em peer_problem_, e os unicos
+  dois lugares que leem esse campo sao o HUD (mod.cpp:451) e o
+  log (mod.cpp:499). Nada no caminho de criacao do personagem
+  consulta esse valor.
+
+  Entao: builds diferentes NAO impedem o boneco de aparecer --
+  eles tornam o teste sem controle, porque voce nao sabe qual
+  dos dois builds produziu o resultado. E' por isso que os dois
+  tem que usar este ZIP, e nao porque o mod bloqueia.
+
+  Se voce esta' com o build certo E mesmo assim nao ve o boneco,
+  esse e' o problema de verdade -- me avise, porque ai' nao e'
+  versao.
 
   Foi o que aconteceu no teste anterior: anfitriao 2BE49E66,
-  convidado 1B7B429D, tudo conectado e nenhum personagem.
+  convidado 1B7B429D, tudo conectado e nenhum personagem. Na
+  epoca isso foi atribuido a' diferenca de build. A leitura do
+  codigo acima diz que essa atribuicao estava ERRADA, e que a
+  causa daquele teste continua desconhecida.
 
   Para conferir o arquivo em si: botao direito no cdmp.asi >
   Propriedades > Hash do arquivo. SHA256 esperado:
