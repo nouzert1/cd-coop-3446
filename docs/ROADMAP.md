@@ -3,6 +3,11 @@
 Everything is developed and tested on **a single PC**. The second player is played by
 `cdmp_peer.exe` until milestone 5.
 
+> **Status note (2026-10-31).** The game auto-updated twice during this project
+> (3424 → 3446 → 3460) and each update required re-measuring every address. The mod now runs on
+> **1.0.0.3460**. For what is open right now, read [BUGS-ABERTOS.md](BUGS-ABERTOS.md) — this file is
+> the historical record of how the features were built, in order.
+
 ## Milestone 0: skeleton ✅ (2026-10-03)
 - `cdmp.asi` loads into `CrimsonDesert.exe` 1.0.0.2976 via Ultimate ASI Loader (`winmm.dll`).
 - Log with the exact game version (PE timestamp `0x6AB28F00`, base `0x140000000`).
@@ -107,8 +112,22 @@ an in-memory loopback, with one server session per user. See
 - ✅ Steam transport over `ISteamNetworkingMessages` from the game's `steam_api64.dll`, without
   callbacks (`docs/research/steam-transporte.md`). Tested live up to "relay ready".
 - ✅ Host and guest without `cdmp_peer` (`[net] role=host|guest`), also over UDP.
-- Missing: first test with a real person.
+- ❌ **Still missing: the first test with a real person.** See `BUGS-ABERTOS.md` §1.1.
+
+## Milestone 6: keeping up with the game ✅ (2026-10-31)
+Two auto-updates, two full re-ports (2976 → 3424 → 3446 → 3460). The method is written down in
+[PORTING.md](PORTING.md) so the next one is a day of work instead of a week.
+
+- ✅ 3446: vtables by RTTI, the Troc array re-found, every struct offset unchanged.
+- ✅ 3460: the same, plus the discovery that the data region is **reorganised, not shifted** — five
+  different deltas in one patch, and the player position moved from a pointer chase to an inline
+  field at `inner+0x460`, proved by motion.
+- ❌ Four data globals were not recovered (guest camera, time sync, minimap icon, and the
+  position self-check). All fail closed. `BUGS-ABERTOS.md` §2.2 has two routes to settle them.
 
 ## Later
 Synchronize enemies and combat (with stable IDs across PCs, not pointers), animations,
 quests and fast travel.
+
+Contributor suggestions — reproducibility, a build-health check, offsets in CI, a
+`looks_like_position()` guard — are in [BUGS-ABERTOS.md](BUGS-ABERTOS.md) §4.
