@@ -326,6 +326,40 @@ inline constexpr uintptr_t kVtStatusComponent = 0x590F6E0;     // 3424:0x590D630
 // (config.cpp:197), so a wrong address here has never been used and cannot have caused
 // anything the user has seen. Leaving it wrong costs the time sync feature, which is off.
 //
+// ---- 2026-10-31: the STRUCT itself is now suspect, and the writer was located ----------
+//
+// Full writeup in docs/research/fieldtime-3446.md. The short version, because it changes what
+// a fix has to do:
+//
+// 1. The FieldTime layout in src/common/field_time.h is a 2976 inheritance. Its from_raw
+//    decomposes with kRawDay = 75'600'000 = 0x4819080 -- and that constant does not appear in
+//    the 3446 binary in either u32 or u64 form (scan "80 19 48 04" -> 0 hits, and the 8-byte
+//    form too). Not proof the layout moved, but the cheap way to find the writer is closed.
+//
+// 2. The writer WAS found, by handler -> service -> apply:
+//      troc --max 2000 | findstr FieldTime  ->  .?AVTrocTrSetFieldTimeAck@pa@@ @ exe+0x6E86DC0
+//      handler instance +0x0C = opcode 0x7FC6, +0x08 = kind 1 (Ack), vtable exe+0x598DE38
+//      handler body exe+0xC9B8E0  ->  [0x1471B1A38] -> [+0x30] -> [+0x11A0] -> call exe+0xB3F070
+//    exe+0xB3F070 is the function that applies the time.
+//
+// 3. That function divides the incoming raw value by [StageInfoManager+0x68], measured at
+//    2081 -- NOT 75600000. Whatever that division is, it is not the day/hour decomposition
+//    the 2976 struct describes. THIS is the strongest evidence that the struct changed, and
+//    it is the thread to pull first.
+//
+// 4. A second thing to settle before trusting either: the game reads the world slot at
+//    exe+0x71B1A38 while kWorldSystemSlot is 0x71B1A40, eight bytes later. Both hold valid
+//    pointers and both are used -- the mod's reads through 0x71B1A40 work (player position is
+//    correct), but the game's time chain from 0x71B1A40 lands on 0xC000000000000000, an
+//    invalid pointer, while from 0x71B1A38 it lands on a valid table. They cannot both be the
+//    same slot for the same chain. Resolve this before using either to find the time.
+//
+// So the next attempt must not be "find the address that holds a FieldTime". It has to be
+// "find what exe+0xB3F070 writes", because the struct it writes may not be the one this code
+// expects. scripts/check-fieldtime.ps1 stays valid as the test for any candidate: it reads the
+// player position in the same run and refuses to call a zero block meaningful unless the world
+// is demonstrably loaded.
+//
 // It stays at the 3424 value rather than 0, because unlike the action-layer sites there is
 // no guard that fails closed on a wrong address here -- there is simply no reader. Setting 0
 // would look like a deliberate "unavailable" marker and would be a lie about what is known.
