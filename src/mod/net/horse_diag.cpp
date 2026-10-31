@@ -24,11 +24,42 @@ struct Site {
     uint8_t head[16];
     const char* name;
 };
-constexpr Site kCcUpdate = {0x85FBA0, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55,
-                                       0x41, 0x56, 0x41, 0x57}, "CC update"};
+// ---- containment sites, 1.0.0.3446 ----------------------------------------
+//
+// All four are build-specific and were re-measured for 3446 on 2026-10-30, because the
+// 3424 values read as garbage here (verified byte-for-byte against an independent read
+// of the same executable on the guest's PC).
+//
+// Measured so far:
+//
+//   kCcUpdate  exe+0x941D40 - three independent agreeing measurements:
+//      1. its body touches the component struct the way read_state() reads it:
+//         [rcx+0x08] actor, [rbx+0x40] state, [rax+0x30] restore, [rbx+0x88] layer,
+//         [rbx+0xA8] pending;
+//      2. it is slot 16 of the vtable of .?AVClientCharacterControlActorComponent@pa@@
+//         at exe+0x59388D0, the same vtable the port already uses as kVtCharacterControl;
+//      3. live: findptr located real instances in the running game and the object has
+//         ALL SIX read_state fields populated, with +0x08 resolving to a
+//         .?AVClientNormalInGameActor@pa@@ and actor+0x60 reading 0xB01017E1 (the 0xB0
+//         prefix is the player actor key family).
+//
+//   kRestore   exe+0x948240 - two agreeing measurements:
+//      1. it reads [this+0x08] (actor), [this+0x40] (state) and [state+0x30] (restore),
+//         and touches [this+0x88] and [this+0x90] (the two layers) - the exact field set
+//         on_restore walks;
+//      2. its 16-byte prologue is byte-identical to the 3424 value. A prologue surviving
+//         a patch is not something to rely on, but here it is corroboration rather than
+//         the basis: the behaviour above is what identifies the function.
+//
+// Still unresolved: kCcPost and kPending. Note the delta between kCcUpdate and kRestore
+// CHANGED between builds (0x4B30 on 3424, 0x6500 here), which is the second independent
+// reason a fixed delta cannot be used to port these - the first being the 0x35 spread
+// this port already measured across the globals.
+constexpr Site kCcUpdate = {0x941D40, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57, 0x48,
+                                       0x83, 0xEC, 0x20, 0x48}, "CC update"};
 constexpr Site kCcPost = {0x860D30, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x56, 0x57,
                                      0x41, 0x56, 0x48, 0x83}, "CC post-update"};
-constexpr Site kRestore = {0x8646D0, {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x20, 0x48, 0x89, 0x50, 0x10, 0x55,
+constexpr Site kRestore = {0x948240, {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x20, 0x48, 0x89, 0x50, 0x10, 0x55,
                                       0x56, 0x57, 0x41, 0x54}, "restore actions"};
 constexpr Site kPending = {0x2329D70, {0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89,
                                        0x74, 0x24, 0x20, 0x57}, "pending actions"};
