@@ -71,6 +71,37 @@ inline constexpr uint32_t kHostileFactions[] = {
 
 // 957 characterinfo variants (load +0x18) never hidden nor relayed by zone:
 // their name has Boss, MiddleBoss or Unique (each player sees their own).
+//
+// =====================================================================================
+// THIS TABLE IS FROM 2976 AND HAS NEVER BEEN REGENERATED. WHAT THAT DOES AND DOES NOT
+// BREAK, MEASURED ON 3446 (round 42):
+//
+// The game grew boss content between the two builds. Searching 3446's type descriptors
+// turns up whole systems the 2976 data had no reason to know about -- BossRush and
+// BossRematch among them (17 types carry "Boss" in the name; TrocTrReadyBossRushAck,
+// TrocTrSetBossRematchLevelReq, MiniGamePhaseData_BossRush_*, ConditionData_CheckBossBattle).
+// Any boss variant introduced by that content is NOT in this array, so is_excluded_variant
+// returns false for it.
+//
+// THE FAILURE THAT DOES *NOT* HAPPEN: nothing becomes relabeled a boss. This array only ever
+// REFUSES. A variant missing from it is treated as an ordinary enemy -- which is the wrong
+// verdict for a boss, but it is a wrong verdict in the direction that already applies to
+// every boss this table does cover, and it is caught downstream by the other two sources of
+// the boss verdict (the sender's kEnemySpawnFlagBoss, and the HP threshold in boss_rules.h).
+// Those two are what actually decide today; this table is the third, weakest one.
+//
+// WHY IT WAS NOT REGENERATED: the variants cannot be read off the binary. The 957 entries
+// were produced by research scripts from the game DATA (the characterinfo table, whose names
+// carry Boss/MiddleBoss/Unique), and that data ships packed in .paz archives -- there are no
+// loose .pastage/.paseq/.characterinfo files on disk, and the stage names do not appear as
+// strings in the executable either (checked: none of bossencounter, cd_boss_, cd_seq_quest_,
+// bossrematch, bossrush scan as strings in 3446). Regenerating it means unpacking and
+// re-running the p_3g research, which is the same missing piece that leaves is_boss_stage_name
+// fed by nothing (see boss_safe.h).
+//
+// SO: treat this array as a floor, not a gate. It cannot admit what should be refused; it can
+// only fail to refuse something new. Two independent sources still stand behind it.
+// =====================================================================================
 inline constexpr uint32_t kExcludedVariants[] = {
     400, 401, 402, 403, 404, 405, 406, 408, 409, 410,
     411, 412, 413, 415, 416, 418, 419, 425, 426, 427,

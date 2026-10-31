@@ -937,11 +937,23 @@ DWORD WINAPI worker(LPVOID) {
                                            : "guest: none set; will fall back to [steam] peer_steamid")
                       : (cfg.net_role_host ? "host: unused, the mod creates the room itself"
                                            : "guest: will look this room up"));
-        log::info("Config: dev clone {} combat {} minimap cycle {} aggro {} enemy relay {} piece4 {} | sniffer {} "
+        // Both switches that can ask for the relay, computed once here so this line and the
+        // shared-loot warning below cannot disagree about what was requested.
+        const bool relay_pref = cfg.coop_enemy_auto || cfg.dev_enemy_relay;
+        log::info("Config: dev clone {} combat {} minimap cycle {} aggro {} piece4 {} | sniffer {} "
                   "record {} | overlay {}",
                   cfg.dev_clone_hotkeys, cfg.dev_combat_tests, cfg.dev_minimap_cycle, cfg.dev_aggro_test,
-                  cfg.dev_enemy_relay, cfg.dev_piece4_test, cfg.sniffer_enabled, cfg.sniffer_record,
+                  cfg.dev_piece4_test, cfg.sniffer_enabled, cfg.sniffer_record,
                   cfg.overlay_enabled);
+        // The relay got its own line, because this one used to print dev_enemy_relay under the
+        // label "enemy relay". That is the DEV switch (default 0); the real one is [coop]
+        // enemy_auto. So a correctly configured player read "enemy relay false" and had no way
+        // to tell it apart from the round-31 bug where the relay truly was not starting -- the
+        // log showed false in both cases. Print the switch that decides, and print what is
+        // actually running, which is the distinction that matters when the two disagree.
+        log::info("Config: enemy relay wanted {} ([coop] enemy_auto={}, [dev] enemy_relay={}{})",
+                  relay_pref ? "yes" : "no", cfg.coop_enemy_auto ? 1 : 0, cfg.dev_enemy_relay ? 1 : 0,
+                  cfg.coop_suppress_lab ? ", suppressed by suppress_lab=1 (the one-PC lab)" : "");
         log::info("Config: time sync {}", cfg.coop_time_sync == 1   ? "send ours"
                                           : cfg.coop_time_sync == 2 ? "take the other player's"
                                                                     : "off");
@@ -982,8 +994,25 @@ DWORD WINAPI worker(LPVOID) {
                           "your own drop when the host kills an enemy you helped with)");
             }
         } else if (!relay_needed) {
-            log::warn("Config: shared loot is ON but [coop] enemy_auto=0, so it can never fire: "
-                      "the enemy relay is what tells the mod which creature a copy is. Set enemy_auto=1.");
+            // TWO reasons switch the relay off, and this message used to name only one of them.
+            // With [coop] suppress_lab=1 -- the one-PC lab (PRUEBAS-COOP.md) -- relay_needed is
+            // false while enemy_auto is still 1, and the old text told the player
+            // "enemy_auto=0 ... set it to 1". Following that advice changes nothing: the lab
+            // still suppresses the relay and the same warning comes back, so the player is sent
+            // to look at a key that was already correct. Report the reason that actually decided.
+            //
+            // The lab suppresses the relay deliberately (native_suppress.cpp): on one PC the
+            // same machine would be both host and guest, so the copies it made would be hidden
+            // by its own zone. This warning is therefore EXPECTED during a lab run, not a fault.
+            if (cfg.coop_enemy_auto) {
+                log::info("Config: shared loot is ON, and the enemy relay is off because "
+                          "[coop] suppress_lab=1 (the one-PC lab). That is expected: the lab works "
+                          "alone and never copies enemies. With suppress_lab=0 this line would say "
+                          "the relay is on.");
+            } else {
+                log::warn("Config: shared loot is ON but [coop] enemy_auto=0, so it can never fire: "
+                          "the enemy relay is what tells the mod which creature a copy is. Set enemy_auto=1.");
+            }
         } else {
             log::info("Config: shared loot (guest) ON (your own drop from the host's kills)");
         }
