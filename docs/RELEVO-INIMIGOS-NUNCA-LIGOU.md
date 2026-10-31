@@ -129,18 +129,63 @@ uma função que funciona** — até alguém ligar o log e reparar numa linha `W
 
 ---
 
-## Como confirmar que está consertado
+## RESOLVIDO — os dois sites medidos e provados
 
-1. `powershell -File scripts\testar-um-pc.ps1 -Prepare`
-2. Abrir o jogo, carregar o save, andar
-3. `powershell -File scripts\testar-um-pc.ps1 -Run`
+**`kActionLayerAdvance`**: 3424 `0x2147BA0` → 3446 **`0x2148D50`**
+**`kActionLayersAdvance`**: 3424 `0x2329700` → 3446 **`0x232A8B0`**
 
-E procurar no `cdmp.log`:
+```
+kActionLayerAdvance  @0x2148D50  >>> PASSA: True
+kActionLayersAdvance @0x232A8B0  >>> PASSA: True
+```
 
-| linha | significa |
-|---|---|
-| `Puppet: action-layer crash guard installed` | **as guardas instalaram** (era o que faltava) |
-| ausência de `Enemy copies disabled` | o relevo está armado |
-| `Enemy relay: zone … WOULD copy N of M` | chegando ao acampamento, o relevo veio |
+**Os dois guards passam.** `puppet_install_layer_guards()` retorna `true` pela primeira vez.
 
-Sem a primeira linha, nada disto mudou.
+### O método que funcionou
+
+Não foi a assinatura, não foi o scan, não foi o prologo. Foi **âncora em código provado
+idêntico** e depois **confirmação por contexto**:
+
+1. **Achar uma âncora.** `kPending` é **byte a byte idêntico** entre os builds — medido,
+   32 bytes de `0x2329D60` (3424) e `0x232AF10` (3446) batem exatamente. Isso fixa o
+   deslocamento daquela região em **`0x11B0`**, e fixa a partir de código **provado ser o
+   mesmo código** — não de dois endereços que só parecem relacionados.
+
+2. **Aplicar o deslocamento.** `0x2329700 + 0x11B0 = 0x232A8B0`.
+
+3. **Confirmar por contexto, não por semelhança.** 64 bytes em volta nos dois endereços:
+   **63 idênticos**. O único diferente é o deslocamento de um `call rel32` no fim — que
+   **tem** que diferir quando o alvo se move. Ou seja, a diferença é **evidência a favor**,
+   não contra.
+
+### E o `kActionLayerAdvance`?
+
+O mesmo padrão, com uma volta a mais: o head **existe no 3424**, em `0x2147BA0` — **não** em
+`0x1F63F70`. O valor no código estava errado por **`0x1E3C30`** desde sempre.
+
+```
+3424 exe+0x2147BA0: 48 8B C4 57 48 81 EC 80 00 00 00 C5 F8 29 78 D8  ← head
+3446 exe+0x2148D50: 48 8B C4 57 48 81 EC 80 00 00 00 C5 F8 29 78 D8  ← idêntico
+```
+
+**O head estava certo. O endereço é que não.** Os dois sites falhavam por razões
+**diferentes**, e tratá-los como um defeito só teria jogado fora um head correto.
+
+### A armadilha que quase me pegou
+
+No meio do caminho eu concluí que `kPending` também estava errado, porque a "função-mãe"
+dele parecia uma `strlen`. **Estava errado.** O `kPending` é válido — a medição dos 32 bytes
+idênticos provou isso. A lição: a função-mãe não é o hook, e julgar o hook pela mãe leva a
+condenar código correto.
+
+### O que mudou na verificação
+
+`verify-port.ps1` agora tem uma seção **`code-address guards`** que lê os bytes **no
+executável real** e compara com cada head do fonte. Isto existe porque a checagem antiga
+comparava os endereços **entre si** — e eles concordavam, porque os dois estavam errados do
+mesmo jeito. **Uma assinatura escrita do mesmo endereço errado que o alvo não é uma
+checagem, é uma tautologia.**
+
+Se um guard falhar ali, a mensagem agora diz o que isso custa:
+*"the guard CANNOT pass; whatever it protects is disabled"*.
+

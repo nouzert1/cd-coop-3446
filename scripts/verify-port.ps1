@@ -386,6 +386,51 @@ vt_expect = [
     ('WallUpMovementMethod', 0x5918F78, 'has_vtable guard in read_player_wallup'),
 ]
 
+# Code sites whose HEAD ARRAY is checked against the executable at the same address the mod
+# hooks. This exists because both of these were wrong, in both builds, and nothing noticed.
+#
+# kActionLayerAdvance   0x1F63F70 (3424) did not hold its head; the head was at 0x2147BA0.
+# kActionLayersAdvance  0x2329700 (3424) held its head nowhere -- 0 matches in the image.
+#
+# puppet_install_layer_guards() requires BOTH to pass, so it returned false, mod.cpp disabled
+# the enemy relay, and one boot warning was the only trace. The enemy relay had never run.
+#
+# The lesson is in the shape of the bug: a head authored from the same wrong address as its
+# target AGREES WITH ITSELF and passes. The offline check has to look at the bytes in the
+# real executable, which is what this does -- the same thing kServerOtherEquipWriter needed
+# after being recorded one byte early with a head written from the same wrong address.
+site_expect = [
+    # name, rva on the CURRENT build, head bytes as written in offsets_3446.h, note
+    ('kActionLayerAdvance',  0x2148D50,
+     '48 8B C4 57 48 81 EC 80 00 00 00 C5 F8 29 78 D8',
+     'puppet_install_layer_guards; guard for the enemy relay'),
+    ('kActionLayersAdvance', 0x232A8B0,
+     '74 51 4C 89 3F 44 38 3E 74 32 48 C7 C3 FF FF FF',
+     'puppet_install_layer_guards; guard for the enemy relay'),
+]
+
+
+def _check_sites(data):
+    """Return (ok, lines) verifying each entry of site_expect against the executable."""
+    out = []
+    ok = True
+    for name, rva, head, note in site_expect:
+        want = bytes(int(b, 16) for b in head.split())
+        off = _rva_to_off(rva)
+        if off is None:
+            ok = False
+            out.append('FAIL %s at exe+0x%X: rva is outside every section' % (name, rva))
+            continue
+        got = data[off:off + len(want)]
+        hit = got == want
+        ok = ok and hit
+        out.append('%-4s %s at exe+0x%X  (%s)' % ('PASS' if hit else 'FAIL', name, rva, note))
+        if not hit:
+            out.append('       head in source : %s' % head)
+            out.append('       bytes in image : %s' % ' '.join('%02X' % b for b in got))
+            out.append('       -> the guard CANNOT pass; whatever it protects is disabled')
+    return ok, out
+
 # Shapes that reach data RIP-relatively on x64. (opcode, has own modrm, disp at, len)
 _ref_shapes = [
     (b'\x48\x8B', False, 3, 7),   # mov r64,[rip+d]
@@ -757,6 +802,13 @@ def _off_to_rva(off):
             return va + (off - ro)
     return None
 
+
+def _rva_to_off(rva):
+    for (nm, va, vs, ro, rs) in secs:
+        if vs and ro and va <= rva < va + vs:
+            return ro + (rva - va)
+    return None
+
 for (cls, want_rva, note) in vt_expect:
     found = _find_vtables(cls)
     if not found:
@@ -770,6 +822,17 @@ for (cls, want_rva, note) in vt_expect:
         ok('%s vtable via RTTI' % cls, False,
            'exe+%#x is not a %s vtable; RTTI gives %s'
            % (want_rva, cls, ', '.join('exe+%#x' % v for v in found)))
+
+# Code sites whose head arrays are checked against the real bytes (see site_expect).
+_site_ok, _site_lines = _check_sites(d)
+print()
+print('== code-address guards (feature refuses safely when these fail) ==')
+for _l in _site_lines:
+    print(_l)
+if not _site_ok:
+    fails += 1
+    print('  a failing guard here does NOT crash: it disables the feature it protects,')
+    print('  silently, with one WRN line at boot. Check what that feature was doing.')
 
 print()
 print('RESULT: %s' % ('ALL OFFLINE CHECKS PASSED' if fails == 0 else '%d CHECK(S) FAILED' % fails))

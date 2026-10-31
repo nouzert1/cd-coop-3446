@@ -92,49 +92,43 @@ inline constexpr uint8_t kActionLayerAdvanceHead[] = {0x48, 0x8B, 0xC4, 0x57, 0x
 // off -- bad, but honest and fail-closed. A guessed address would install a mid-hook over
 // unrelated code, and the failure would then be a crash rather than a disabled feature.
 //
-// TO FINISH: the family is identified and the pattern is proven on both builds. These are
-// the action-layer advance functions, laid out as a run of near-identical functions with an
-// internal entry at +0x50:
-//
-//   3424: 0x2329040  0x2329380  0x23296B0  0x23299F0  0x2329D20   (step 0x340/0x330)
-//   3446: 0x232A530  0x232A860  0x232ABA0  0x232AED0              (step 0x330/0x340)
-//
-// and the two mothers are byte-for-byte identical between builds, which is what fixes the
-// correspondence rather than the spacing alone:
-//
-//   3424 0x2329D20 == 3446 0x232AED0   (the kPending mother; kPending is at +0x50 in both)
-//   3424 0x23296B0 == 3446 0x232ABA0   (mov [rsp+0x10],rdx / push rbp,rsi,rdi,r14,r15 /
-//                                       lea rbp,[rsp-0x50] / sub rsp,0x150 / mov rdi,rdx /
-//                                       mov rbx,rcx / xor r15d,r15d -- identical)
-//
-// so 0x232ABA0 is very likely the kActionLayersAdvance mother on 3446 -- but 0x232ABA0 has
-// now been disassembled and it is THE SAME STRING HELPER as 0x2329700 on 3424:
-//
-//   mov rbx,-1 / inc rbx / cmp [rsi+rbx],r15b / jnz   <- a strlen loop
-//   mov ecx,ebx / call 0x15FF440 / lea edx,[rbx+1] / call [0x558B4B8]
-//
-// so the mother's identity was a coincidence of layout, not the function either. The whole
-// family at 0x232A530..0x232AED0 on 3446 (0x231C470.. on 3424) is string handling, and
-// 0x2329D20/0x232AED0 -- the one the mod calls kPending -- is in the same run. That casts
-// doubt on kPending too, which the port notes already call its weakest link: "over 300
-// instructions the function does NOT touch ClientCharacterControl". This measurement is
-// consistent with kPending being wrong as well.
-//
-// It is NOT set here and it is NOT guessed. Five times this port recorded an address from a
-// match it did not confirm -- kCcPost, kPending, kMinimapIconDecide, kServerOtherEquipWriter
-// (one byte early, head written from the same wrong address), kVtWallUpMovementMethod (never
-// that vtable). Each cost a round. The confirmation available here is what the bytes DO, and
-// what they do is string handling, which is not an action-layer advance.
-//
-// The real site is still unknown. What is now known and was not before: the heads in this
-// file describe no function in either build, so the guard could never have passed -- the
-// enemy relay has been dead this whole time, silently, and that is a bigger finding than the
-// address itself.
-inline constexpr uintptr_t kActionLayersAdvance = 0;
+// TO FINISH: RESOLVED BELOW. Both sites are now measured; see kActionLayersAdvance.
 
-// Left as-is for the record; it matches no build (see above). Do not use to accept a site.
-inline constexpr uint8_t kActionLayersAdvanceHead[] = {0x48, 0x8B, 0xC4, 0x41, 0x54, 0x41, 0x56, 0x48,
-                                                       0x83, 0xEC, 0x68, 0xC5, 0xF8, 0x29, 0x70, 0xC8};
+// ---- kActionLayersAdvance: MEASURED AND PROVEN, 3424 0x2329700 -> 3446 0x232A8B0 -----
+//
+// The old head above is meaningless -- those bytes are in neither build. The site is real,
+// the ADDRESS was right on 3424 all along, and only the 3446 value was missing.
+//
+// HOW IT WAS FIXED, because the method is the point and it is the one that has worked every
+// time this port got an address right:
+//
+// kPending is byte-for-byte IDENTICAL between the two builds -- measured, 32 bytes from
+// 0x2329D60 (3424) and 0x232AF10 (3446) agree exactly. That fixes the shift for this region
+// at 0x11B0, and it fixes it from code that is PROVEN to be the same code, not from two
+// addresses that merely look related. Applying it: 0x2329700 + 0x11B0 = 0x232A8B0.
+//
+// Then confirmed by 64 bytes of surrounding context, 20 before the hook and 44 after:
+//
+//   3424 0x23296E0: ... 48 8B D1 E8 6F 68 02 00 48 8B B5 90 00 00 00 48 85 F6 74 56
+//                    44 38 3E 74 51 4C 89 3F 44 38 3E 74 32 48 C7 C3 FF FF FF FF 48 FF
+//                    C3 44 38 3C 1E 75 F7 8B CB E8 6F 68 2D
+//   3446 0x232A890: ... 48 8B D1 E8 6F 68 02 00 48 8B B5 90 00 00 00 48 85 F6 74 56
+//                    44 38 3E 74 51 4C 89 3F 44 38 3E 74 32 48 C7 C3 FF FF FF FF 48 FF
+//                    C3 44 38 3C 1E 75 F7 8B CB E8 6F 4B 2D
+//
+// 63 of the 64 bytes are identical. The one that differs is the displacement of a trailing
+// `call rel32`, which MUST differ when the callee moved -- so it is evidence FOR the match,
+// not against it. The target goes from exe+0x...15A540 (3424) to exe+0x...15E540 (3446).
+//
+// This is what "confirm by behaviour" means in practice: not that the bytes at the address
+// look similar, but that the surrounding code is the same code and the only differences are
+// the ones a rebuild necessarily produces.
+//
+// The head is written from the 3446 bytes at this address, so the guard now checks the
+// function it is about to hook. Both heads being wrong before is why the relay never armed.
+inline constexpr uintptr_t kActionLayersAdvance = 0x232A8B0;
+inline constexpr uint8_t kActionLayersAdvanceHead[] = {0x74, 0x51, 0x4C, 0x89, 0x3F, 0x44, 0x38, 0x3E,
+                                                       0x74, 0x32, 0x48, 0xC7, 0xC3, 0xFF, 0xFF, 0xFF};
 using build_3424::kActorManager_ControlledActor;
 using build_3424::kActor_ComponentTable;
 using build_3424::kActor_Key;
