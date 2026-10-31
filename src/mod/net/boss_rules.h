@@ -70,6 +70,27 @@ inline bool is_boss_stage_name(const std::string& name) {
 //
 // `is_boss` is passed in rather than looked up here, so this stays a pure rule with no
 // dependency on boss_safe.cpp's mutable state and can be unit-tested.
+//
+// WHO FILLS `is_boss`, since the rule is useless without it. There are exactly two sources,
+// and on the guest the first one is the only one that can be right:
+//
+//   1. THE SENDER'S FLAG (enemy_relay.cpp:1933). v10's EnemySpawn carries kEnemySpawnFlagBoss,
+//      set by the host from `origin == 3 || boss_is_boss(key)` at line 708. The guest calls
+//      boss_note_max_hp(copy, kBossMaxHpX1000) on receipt -- a deliberate synthetic value, not
+//      a measurement: it only has to clear the >= 500000 threshold, because kBossMaxHpX1000 is
+//      a CLASSIFIER here, not a real HP. The host can see the stage that spawned the actor;
+//      the guest cannot, which is the whole reason the flag travels.
+//
+//   2. THE HP FALLBACK (local_capture.cpp:552), from the VaryHP packet's hp_max -- the only
+//      place the mod ever sees a real HP POOL. The research measured every NPC across 58
+//      captures at <= 220 max HP, so >= 500 genuinely separates a stage boss from a monster.
+//      On the guest this fallback is too late to matter for the FIRST blow on a copy, which is
+//      why source 1 exists.
+//
+// Neither source ever LOWERS the flag (boss_safe.cpp, no path clears it), so a boss verdict is
+// permanent for the session. That direction is deliberate: a wrong boss verdict costs the
+// GUEST the cheat finisher on one enemy, while a boss killed outside its stage script costs
+// the HOST a stuck quest. The asymmetry is the point.
 inline bool is_relayable_record_type(uint32_t type, bool is_boss) {
     if (type == 3) return true;
     if (type == 4) return is_boss;

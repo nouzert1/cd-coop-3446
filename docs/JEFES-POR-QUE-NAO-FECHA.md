@@ -124,6 +124,40 @@ O que faria os dois avançarem é o mesmo **enfoque D** acima, e o documento tam
 O dragão é **tipo 5**. Ligar isso sem validação ao vivo é o caminho direto para o
 fechamento que já custou uma sessão inteira de diagnóstico (ver `DIAGNOSTICO-HANG.md`).
 
+### ATUALIZAÇÃO (rodada 30): o tipo 4 foi implementado; o 5 continua recusado
+
+A regra saiu do `enemy_relay.cpp` e virou uma função **pura e testável** em `boss_rules.h`:
+
+```cpp
+inline bool is_relayable_record_type(uint32_t type, bool is_boss) {
+    if (type == 3) return true;    // pessoa, sempre
+    if (type == 4) return is_boss; // nomeado: SÓ jefe (pesquisa linhas 400 e 458)
+    return false;
+}
+```
+
+O `load_is_relayable` do `enemy_relay.cpp` é agora um invólucro de uma linha que fornece o
+que a regra não pode ver sozinha: se a chave é um jefe conhecido. Nove `CHECK`s prendem o
+comportamento, incluindo o que mais importa:
+
+```cpp
+CHECK(!net::is_relayable_record_type(5, true));   // veículo jefe (dragão): ainda recusado
+```
+
+**Se alguém relaxar o tipo 5 para fazer jefes dragão funcionarem, essa linha falhando é o
+objetivo.** Leia a linha 401 e a linha de risco R2 antes: o dragão é tipo 5, e ligá-lo sem
+resolver o ramo de veículos fecha o jogo.
+
+| tipo | o que é | estado |
+|---|---|---|
+| 3 | pessoa | relevado, sempre |
+| **4** | **nomeado** | **SÓ se for jefe** — implementado, **não verificado ao vivo** |
+| 5 | veículo (tanque, avião, **dragão**) | **recusado** — risco `0x925F0E` |
+| 7 | armas/partes do jefe | não relevado sozinho; são **ATACANTES válidos** |
+
+O tipo 4 nunca rodou numa luta de jefe real. O que o valida até agora: compila, os nove
+testes passam, a regra segue a pesquisa. **Isso não é o mesmo que ter visto funcionar.**
+
 ---
 
 ## 4. Resumo honesto
@@ -136,7 +170,7 @@ fechamento que já custou uma sessão inteira de diagnóstico (ver `DIAGNOSTICO-
 | loot comum compartilhado | implementado, provado no protocolo |
 | **loot de jefe para o convidado** | **bloqueado por desenho** (§1) |
 | **missão do convidado avançar** | **não acontece por desenho** (§2) |
-| tipos 4/5/7 | adiado por risco de fechamento (§3) |
+| tipos 4/5/7 | 4 implementado, **não testado**; 5 recusado por risco; 7 são atacantes (§3) |
 | **teste real 2 PCs** | ❌ **o bloqueio de verdade** |
 
 ### A conclusão que interessa
