@@ -73,6 +73,27 @@ O script:
 - **recusa** se o jogo estiver aberto (a menos que você use `-Force`, e não use)
 - faz backup do `.asi` anterior com data e hora
 - **verifica o SHA256 depois de copiar** — não confia que a cópia deu certo
+- confere se o seu `cdmp.ini` está com `role=host` e avisa se não estiver
+
+> ⚠️ **O script só instala o `cdmp.asi`.** Ele **não** instala o `cdmp.ini` nem o `winmm.dll` —
+> apenas confere se já estão lá.
+
+#### Se for a PRIMEIRA vez neste PC
+
+Você não tem o carregador nem a configuração. Então:
+
+1. Pegue o **mesmo zip** que você mandou para o convidado
+2. Copie para `bin64`:
+   ```
+   cdmp.asi      (o script acima já pôs este)
+   dinput8.dll   → RENOMEIE para winmm.dll
+   ```
+3. Para o `cdmp.ini`, use o perfil de **anfitrião**, não o do zip (o do zip é `role=guest`).
+   No repositório ele está em `kit\coop\cdmp.ini.anfitrion` — copie como `cdmp.ini`.
+
+> ⚠️ **Se você pular o passo 3**, o script avisa:
+> `nao ha cdmp.ini ... o padrao de [coop] enabled e 0, entao o co-op nao liga sozinho`.
+> É exatamente o sintoma de "conecta mas não aparece nada".
 
 ### 2.3 Confira a instalação
 
