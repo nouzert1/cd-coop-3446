@@ -8,11 +8,12 @@
 // its own header makes the next patch the same shape of change: add
 // offsets_<build>.h, point the include below at it, done.
 //
-// The build targeted is 3446. The 3424 table is kept alongside it because 3446
-// builds on it (re-exporting the values a patch does not move), and because the
-// diff between two builds' tables is the most useful thing a future port can read.
+// The build targeted is 3460. Each table is kept alongside the last because a new
+// build builds on it (re-exporting the values a patch does not move), and because
+// the diff between two builds' tables is the most useful thing a future port can
+// read. There are now three: 3424 -> 3446 -> 3460, two auto-updates in two days.
 //
-// Consumers write `namespace off = build_3446;`. To retarget, change the include
+// Consumers write `namespace off = build_3460;`. To retarget, change the include
 // here and that alias in the consumers.
 
-#include "mod/game/offsets_3446.h"
+#include "mod/game/offsets_3460.h"
