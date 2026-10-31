@@ -558,7 +558,11 @@ struct LateInit {
     bool minimap_cycle;
     bool aggro_test;
     bool enemies_target_copy;
-    bool enemy_relay;
+    // Was `dev_enemy_relay` alone, which is why the relay thread never started for a normal
+    // user: the dev switch defaults to false and the real switch, [coop] enemy_auto, was
+    // never consulted here. Carries the same decision run_network makes, so the loop, g_auto
+    // and the config log cannot disagree. See the note at its use site.
+    bool relay_wanted;
     bool piece4_test;
     bool guest_hits, guest_hit_stagger, player_hit_react, player_hit_lethal;
     bool attack_probe;
@@ -783,10 +787,28 @@ DWORD WINAPI late_init(LPVOID param) {
             log::warn("     Usually an offset for this game build; see docs/RELEVO-INIMIGOS-NUNCA-LIGOU.md");
         }
         net::enemy_set_receive_enabled(guarded);
-        // Sending OUR enemies (Ctrl+F6 / Ctrl+F7): the host only.
-        if (init->enemy_relay && guarded) {
+        // Sending OUR enemies (Ctrl+F6 manual / Ctrl+F7 automatic).
+        //
+        // THIS USED TO TEST `init->enemy_relay`, WHICH IS `cfg.dev_enemy_relay` -- a DEV
+        // switch, default false (config.h:54). So the thread only started when someone put
+        // `[dev] enemy_relay=1` in cdmp.ini, and the feature the user actually asks for,
+        // `[coop] enemy_auto` (default ON), was never consulted here.
+        //
+        // The failure was silent and looked like success: run_network calls enemy_set_auto(true)
+        // on cfg.coop_enemy_auto, so `g_auto` was set, the config log said the relay was on,
+        // and nothing ever consumed it because the loop that drives it was never created.
+        // A flag that is set and never read is indistinguishable from a working feature.
+        //
+        // Measured live 2026-10-30: the crash guard installed, the relay reported no error,
+        // the player stood 200 m from Bleed Bandits camp with good link stats, and not one
+        // `Enemy relay:` line appeared in the whole session. Fixed by asking the same two
+        // switches run_network asks, so the thread, g_auto and the log all agree.
+        const bool relay_wanted = init->relay_wanted;
+        if (relay_wanted && guarded) {
             CloseHandle(CreateThread(
                 nullptr, 0, [](LPVOID) -> DWORD { net::enemy_test_loop(g_stop); return 0; }, nullptr, 0, nullptr));
+        } else if (relay_wanted && !guarded) {
+            log::warn("Enemy relay: wanted but not started (its crash guards did not install)");
         }
         net::capture_install_equip_hook();
         if (init->attack_probe) {
@@ -968,7 +990,9 @@ DWORD WINAPI worker(LPVOID) {
                                                       dir, cfg.coop_minimap_icon, cfg.dev_minimap_cycle,
                                                       in_game && cfg.dev_aggro_test,
                                                       cfg.coop_enemies_target_copy,
-                                                      in_game && cfg.dev_enemy_relay,
+                                                      in_game && cfg.coop_enabled &&
+                                                          (cfg.coop_enemy_auto || cfg.dev_enemy_relay) &&
+                                                          !cfg.coop_suppress_lab,
                                                       in_game && cfg.dev_piece4_test,
                                                       cfg.coop_guest_hits, cfg.coop_guest_hit_stagger,
                                                       cfg.coop_player_hit_react, cfg.coop_player_hit_lethal,
