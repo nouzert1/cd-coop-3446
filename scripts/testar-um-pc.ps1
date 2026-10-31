@@ -80,7 +80,20 @@ if ($Prepare) {
     Get-Content $ini -Encoding Unicode | Select-String '^\s*(transport|role|offset_m|enemy_auto|suppress|guest_hits|boss_safe|guest_loot)\s*=' |
         ForEach-Object { Write-Host "  $($_.Line.Trim())" }
     Write-Host ''
-    Write-Host 'AGORA: abra o jogo, carregue o save, e rode -Run noutra janela.'
+    # Isto e' a armadilha que faz o teste parecer quebrado. load_config roda UMA vez, no
+    # boot do mod (mod.cpp:836), e o Config fica guardado. Com o jogo ja' aberto, mudar o
+    # cdmp.ini nao muda nada -- o mod continua em transporte steam e o resumo sai todo vazio,
+    # o que se le como "o codigo nao funciona" quando na verdade a config nova nunca foi
+    # lida. Dizer isto aqui e' mais barato que alguem descobrir isso do jeito dificil.
+    if (Get-Process -Name CrimsonDesert -ErrorAction SilentlyContinue) {
+        Write-Host 'ATENCAO: o jogo esta ABERTO.' -ForegroundColor Yellow
+        Write-Host 'O mod le o cdmp.ini UMA vez, no boot. Com o jogo aberto esta config NAO vale:'
+        Write-Host 'ele continua em transporte steam e o resumo vai sair vazio.'
+        Write-Host ''
+        Write-Host '  FECHE o jogo e abra de novo (carregue o save) ANTES de rodar -Run.' -ForegroundColor Yellow
+    } else {
+        Write-Host 'Agora: abra o jogo, carregue o save, e rode -Run noutra janela.'
+    }
     exit 0
 }
 
@@ -106,6 +119,16 @@ if (-not (Test-Path $Peer)) { throw "cdmp_peer.exe nao encontrado; passe -Peer <
 if (-not (Get-Process -Name CrimsonDesert -ErrorAction SilentlyContinue)) {
     Write-Host 'O jogo nao esta aberto. Abra, carregue o save e rode de novo.' -ForegroundColor Yellow
     exit 2
+}
+
+# O mod guarda o Config lido no boot. Se o cdmp.ini no disco nao for o que o processo em
+# execucao leu, o teste produz um resumo vazio -- e um resumo vazio se le como "o codigo
+# nao funciona", que e' a conclusao errada. Conferir antes custa uma linha e evita que a
+# sessao inteira seja jogada fora.
+$nett = (Get-Content $ini -Encoding Unicode | Select-String '^\s*transport\s*=\s*(\S+)' | Select-Object -First 1)
+if ($nett -and $nett.Matches[0].Groups[1].Value -ne 'udp') {
+    Write-Host "AVISO: o cdmp.ini diz transport=$($nett.Matches[0].Groups[1].Value), nao udp." -ForegroundColor Yellow
+    Write-Host 'Rode -Prepare primeiro, e ele explica o que fazer com o jogo aberto.'
 }
 
 # Marca onde o log estava, para resumir so o que esta sessao produziu. Sem isto o resumo
