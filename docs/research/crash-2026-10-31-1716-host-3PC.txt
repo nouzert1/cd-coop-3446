@@ -25,22 +25,22 @@
 [17:08:13.954] INF [T512] Late init: waiting for the game to finish starting up
 [17:08:13.970] INF [T26316] Local player: WorldSystem not created
 [17:08:14.956] INF [T26316] Steam: direct connections off (relay only: the other player never sees your IP)
-[17:08:14.956] INF [T26316] Steam: ready as 'Nouzert SKINS' (SteamID64 76561199441047799), channel 67, host
+[17:08:14.956] INF [T26316] Steam: ready as 'CONVIDADO' (SteamID64 <STEAMID-CONVIDADO>), channel 67, host
 [17:08:14.960] INF [T26316] Steam: no friends are playing Crimson Desert right now
 [17:08:14.960] INF [T26316] Room: Steam matchmaking resolved
-[17:08:15.252] INF [T26316] Room: hosting, code 1YZDAWX (lobby 109775243030473629, host SteamID64 76561199441047799)
+[17:08:15.252] INF [T26316] Room: hosting, code 1YZDAWX (lobby 109775243030473629, host SteamID64 <STEAMID-CONVIDADO>)
 [17:08:15.252] INF [T26316] Room: your code is 1YZDAWX -- send it to your friend
 [17:08:15.461] INF [T26316] Steam: relay network status 2 (100 = ready)
-[17:08:18.956] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 2 | -
+[17:08:18.956] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 2 | -
 [17:08:18.956] INF [T26316] Local: unavailable (WorldSystem not created)
 [17:08:18.956] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:18.956] INF [T26316] Overlay: installed false disabled false | presents 0 drawn 0 | queue -
 [17:08:23.650] INF [T26316] Local player: no controlled actor (not in world)
-[17:08:23.962] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 2 | -
+[17:08:23.962] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 2 | -
 [17:08:23.962] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:23.962] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:23.962] INF [T26316] Overlay: installed false disabled false | presents 0 drawn 0 | queue -
-[17:08:28.962] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 2 | -
+[17:08:28.962] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 2 | -
 [17:08:28.962] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:28.962] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:28.962] INF [T26316] Overlay: installed false disabled false | presents 0 drawn 0 | queue -
@@ -79,69 +79,69 @@
 [17:08:32.615] INF [T6632] Overlay: hooked ExecuteCommandLists at 0x7FFD6E023370 (first bytes 48 89 5C 24 08)
 [17:08:32.800] INF [T6632] Overlay ready: 3 buffers, format 28, 1920x1200, queue via ExecuteCommandLists (present thread)
 [17:08:33.126] INF [T26316] Steam: relay network status 3 (100 = ready)
-[17:08:33.969] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 3 | -
+[17:08:33.969] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 3 | -
 [17:08:33.969] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:33.969] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:33.969] INF [T26316] Overlay: installed true disabled false | presents 16 drawn 15 | queue ExecuteCommandLists (present thread)
-[17:08:38.974] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 3 | -
+[17:08:38.974] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 3 | -
 [17:08:38.974] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:38.974] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:38.974] INF [T26316] Overlay: installed true disabled false | presents 285 drawn 284 | queue ExecuteCommandLists (present thread)
 [17:08:40.164] INF [T26316] Steam: relay network status 100 (100 = ready)
-[17:08:43.975] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:08:43.975] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:08:43.975] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:43.975] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:43.975] INF [T26316] Overlay: installed true disabled false | presents 541 drawn 540 | queue ExecuteCommandLists (present thread)
-[17:08:48.980] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:08:48.980] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:08:48.980] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:48.980] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:48.980] INF [T26316] Overlay: installed true disabled false | presents 781 drawn 780 | queue ExecuteCommandLists (present thread)
-[17:08:53.979] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:08:53.979] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:08:53.979] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:53.979] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:53.979] INF [T26316] Overlay: installed true disabled false | presents 1066 drawn 1065 | queue ExecuteCommandLists (present thread)
-[17:08:58.980] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:08:58.980] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:08:58.980] INF [T26316] Local: unavailable (no controlled actor (not in world))
 [17:08:58.980] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:08:58.980] INF [T26316] Overlay: installed true disabled false | presents 1336 drawn 1335 | queue ExecuteCommandLists (present thread)
 [17:09:01.748] INF [T26316] Local player: control inner missing
-[17:09:03.982] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:03.982] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:03.982] INF [T26316] Local: unavailable (control inner missing)
 [17:09:03.982] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:03.982] INF [T26316] Overlay: installed true disabled false | presents 1628 drawn 1627 | queue ExecuteCommandLists (present thread)
 [17:09:05.515] INF [T26316] Local player: loading (actor parked at the origin)
-[17:09:08.981] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:08.981] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:08.981] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:08.981] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:08.981] INF [T26316] Overlay: installed true disabled false | presents 1926 drawn 1925 | queue ExecuteCommandLists (present thread)
-[17:09:13.988] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:13.988] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:13.988] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:13.988] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:13.988] INF [T26316] Overlay: installed true disabled false | presents 2176 drawn 2175 | queue ExecuteCommandLists (present thread)
 [17:09:16.143] INF [T31004] Capture: user template (user 0x90100000, player 0xA0100001, 16637 bytes)
 [17:09:16.143] INF [T31004] Capture: body template (body 0xB0100065, 23082 bytes) [generation 1]
-[17:09:18.989] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:18.989] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:18.989] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:18.989] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:18.989] INF [T26316] Overlay: installed true disabled false | presents 2372 drawn 2371 | queue ExecuteCommandLists (present thread)
-[17:09:23.992] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:23.992] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:23.992] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:23.992] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:23.992] INF [T26316] Overlay: installed true disabled false | presents 2526 drawn 2525 | queue ExecuteCommandLists (present thread)
-[17:09:28.994] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:28.994] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:28.994] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:28.994] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:28.994] INF [T26316] Overlay: installed true disabled false | presents 2681 drawn 2680 | queue ExecuteCommandLists (present thread)
-[17:09:34.001] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:34.001] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:34.001] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:34.001] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:34.001] INF [T26316] Overlay: installed true disabled false | presents 2854 drawn 2853 | queue ExecuteCommandLists (present thread)
-[17:09:38.997] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:38.997] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:38.997] INF [T26316] Local: unavailable (loading (actor parked at the origin))
 [17:09:38.997] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:38.997] INF [T26316] Overlay: installed true disabled false | presents 3039 drawn 3038 | queue ExecuteCommandLists (present thread)
 [17:09:42.464] INF [T26316] Local player: in world
-[17:09:44.004] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:44.004] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:44.004] INF [T26316] Local: pos (-20626.58, 621.24, -6813.53) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:09:44.004] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:44.004] INF [T26316] Overlay: installed true disabled false | presents 3223 drawn 3222 | queue ExecuteCommandLists (present thread)
@@ -149,103 +149,103 @@
 [17:09:44.923] INF [T31004] Capture: body template (body 0xB0100070, 22953 bytes) [generation 2]
 [17:09:45.130] INF [T31004] Capture: horse template (horse 0xB0100003, 7751 bytes)
 [17:09:45.165] INF [T31004] Capture: horse template (horse 0xB0100005, 9645 bytes)
-[17:09:49.007] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:49.007] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:49.007] INF [T26316] Local: pos (-20626.54, 621.21, -6813.34) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:09:49.007] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:49.007] INF [T26316] Overlay: installed true disabled false | presents 3373 drawn 3372 | queue ExecuteCommandLists (present thread)
-[17:09:54.011] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:54.011] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:54.011] INF [T26316] Local: pos (-20626.61, 621.15, -6813.42) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:09:54.011] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:54.011] INF [T26316] Overlay: installed true disabled false | presents 3520 drawn 3519 | queue ExecuteCommandLists (present thread)
-[17:09:59.012] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:09:59.012] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:09:59.012] INF [T26316] Local: pos (-20626.62, 621.16, -6813.44) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:09:59.012] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:09:59.012] INF [T26316] Overlay: installed true disabled false | presents 3659 drawn 3658 | queue ExecuteCommandLists (present thread)
-[17:10:04.013] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:04.013] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:04.013] INF [T26316] Local: pos (-20626.62, 621.16, -6813.44) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:04.013] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:04.013] INF [T26316] Overlay: installed true disabled false | presents 3821 drawn 3820 | queue ExecuteCommandLists (present thread)
-[17:10:09.015] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:09.015] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:09.015] INF [T26316] Local: pos (-20626.62, 621.16, -6813.44) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:09.015] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:09.015] INF [T26316] Overlay: installed true disabled false | presents 3985 drawn 3984 | queue ExecuteCommandLists (present thread)
-[17:10:14.018] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:14.018] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:14.018] INF [T26316] Local: pos (-20626.80, 621.29, -6814.79) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:14.018] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:14.018] INF [T26316] Overlay: installed true disabled false | presents 4129 drawn 4128 | queue ExecuteCommandLists (present thread)
-[17:10:19.020] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:19.020] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:19.020] INF [T26316] Local: pos (-20624.99, 618.96, -6825.20) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:19.020] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:19.020] INF [T26316] Overlay: installed true disabled false | presents 4265 drawn 4264 | queue ExecuteCommandLists (present thread)
-[17:10:24.024] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:24.024] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:24.024] INF [T26316] Local: pos (-20620.70, 619.13, -6822.16) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 303.0/320.0 | check vs game global 2097558656.00 m
 [17:10:24.024] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:24.024] INF [T26316] Overlay: installed true disabled false | presents 4397 drawn 4396 | queue ExecuteCommandLists (present thread)
-[17:10:29.025] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:29.025] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:29.025] INF [T26316] Local: pos (-20604.71, 622.49, -6828.80) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:29.025] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:29.025] INF [T26316] Overlay: installed true disabled false | presents 4534 drawn 4533 | queue ExecuteCommandLists (present thread)
-[17:10:34.037] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:34.037] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:34.037] INF [T26316] Local: pos (-20616.12, 619.25, -6827.18) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:34.037] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:34.037] INF [T26316] Overlay: installed true disabled false | presents 4671 drawn 4670 | queue ExecuteCommandLists (present thread)
-[17:10:39.037] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
+[17:10:39.037] INF [T26316] Net: connecting | sent 0 recv 0 rejected 0 | rtt 0.0 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 0 recv 0 send errors 0 | session -1 | relay 100 | -
 [17:10:39.037] INF [T26316] Local: pos (-20600.37, 623.55, -6829.62) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:39.037] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:39.037] INF [T26316] Overlay: installed true disabled false | presents 4810 drawn 4809 | queue ExecuteCommandLists (present thread)
-[17:10:40.079] INF [T26316] Network: player at steam:76561198410974148 is joining
+[17:10:40.079] INF [T26316] Network: player at steam:<STEAMID-ANFITRIAO> is joining
 [17:10:40.079] INF [T26316] Session: connected to peer 'Player'
 [17:10:40.079] INF [T26316] Co-op: connected to 'Player'
 [17:10:40.079] INF [T26316] Puppet offset set to 0.00 m
 [17:10:40.079] INF [T26316] Timing: network loop's enemy/zone work, 10 s: 1 loops | p50 0.0 p95 0.0 max 0.0 ms
-[17:10:40.581] INF [T26316] Steam: session with 76561198410974148 is connected
+[17:10:40.581] INF [T26316] Steam: session with <STEAMID-ANFITRIAO> is connected
 [17:10:41.615] INF [T26316] Co-op: sent our character (49174 bytes, spawn 1)
-[17:10:44.058] INF [T26316] Net: connected | sent 122 recv 54 rejected 0 | rtt 45.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 122 recv 54 send errors 0 | session 3 | relay 100 | ping 28 ms, out 0.0 KB/s (0 pkt/s), in 0.0 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:10:44.058] INF [T26316] Net: connected | sent 122 recv 54 rejected 0 | rtt 45.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 122 recv 54 send errors 0 | session 3 | relay 100 | ping 28 ms, out 0.0 KB/s (0 pkt/s), in 0.0 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:10:44.058] INF [T26316] Local: pos (-20615.24, 619.15, -6833.28) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:44.058] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:44.058] INF [T26316] Overlay: installed true disabled false | presents 4948 drawn 4947 | queue ExecuteCommandLists (present thread)
-[17:10:49.053] INF [T26316] Net: connected | sent 219 recv 64 rejected 0 | rtt 37.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 219 recv 64 send errors 0 | session 3 | relay 100 | ping 25 ms, out 11.4 KB/s (25 pkt/s), in 1.0 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:10:49.053] INF [T26316] Net: connected | sent 219 recv 64 rejected 0 | rtt 37.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 219 recv 64 send errors 0 | session 3 | relay 100 | ping 25 ms, out 11.4 KB/s (25 pkt/s), in 1.0 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:10:49.053] INF [T26316] Local: pos (-20615.03, 619.12, -6831.43) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 310.8/320.0 | check vs game global 2097558656.00 m
 [17:10:49.053] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:49.053] INF [T26316] Overlay: installed true disabled false | presents 5085 drawn 5084 | queue ExecuteCommandLists (present thread)
 [17:10:50.090] INF [T26316] Timing: network loop's enemy/zone work, 10 s: 542 loops | p50 0.0 p95 0.0 max 0.1 ms
-[17:10:54.053] INF [T26316] Net: connected | sent 316 recv 74 rejected 0 | rtt 36.7 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 316 recv 74 send errors 0 | session 3 | relay 100 | ping 25 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:10:54.053] INF [T26316] Net: connected | sent 316 recv 74 rejected 0 | rtt 36.7 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 316 recv 74 send errors 0 | session 3 | relay 100 | ping 25 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:10:54.053] INF [T26316] Local: pos (-20614.89, 619.13, -6831.40) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:54.053] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:54.053] INF [T26316] Overlay: installed true disabled false | presents 5224 drawn 5223 | queue ExecuteCommandLists (present thread)
-[17:10:59.059] INF [T26316] Net: connected | sent 413 recv 84 rejected 0 | rtt 37.8 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 413 recv 84 send errors 0 | session 3 | relay 100 | ping 27 ms, out 1.5 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:10:59.059] INF [T26316] Net: connected | sent 413 recv 84 rejected 0 | rtt 37.8 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 413 recv 84 send errors 0 | session 3 | relay 100 | ping 27 ms, out 1.5 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:10:59.059] INF [T26316] Local: pos (-20619.22, 626.79, -6835.99) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:10:59.059] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:10:59.059] INF [T26316] Overlay: installed true disabled false | presents 5362 drawn 5361 | queue ExecuteCommandLists (present thread)
 [17:11:00.093] INF [T26316] Timing: network loop's enemy/zone work, 10 s: 587 loops | p50 0.0 p95 0.0 max 0.1 ms
-[17:11:04.064] INF [T26316] Net: connected | sent 511 recv 94 rejected 0 | rtt 32.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 511 recv 94 send errors 0 | session 3 | relay 100 | ping 23 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:11:04.064] INF [T26316] Net: connected | sent 511 recv 94 rejected 0 | rtt 32.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 511 recv 94 send errors 0 | session 3 | relay 100 | ping 23 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:11:04.064] INF [T26316] Local: pos (-20633.51, 623.49, -6830.05) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:04.064] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:04.064] INF [T26316] Overlay: installed true disabled false | presents 5498 drawn 5497 | queue ExecuteCommandLists (present thread)
-[17:11:09.065] INF [T26316] Net: connected | sent 608 recv 104 rejected 0 | rtt 30.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 608 recv 104 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:11:09.065] INF [T26316] Net: connected | sent 608 recv 104 rejected 0 | rtt 30.6 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 608 recv 104 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:11:09.065] INF [T26316] Local: pos (-20639.78, 625.73, -6839.35) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:09.065] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:09.065] INF [T26316] Overlay: installed true disabled false | presents 5630 drawn 5629 | queue ExecuteCommandLists (present thread)
 [17:11:10.106] INF [T26316] Timing: network loop's enemy/zone work, 10 s: 612 loops | p50 0.0 p95 0.0 max 0.1 ms
-[17:11:14.080] INF [T26316] Net: connected | sent 707 recv 114 rejected 0 | rtt 30.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 707 recv 114 send errors 0 | session 3 | relay 100 | ping 24 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:11:14.080] INF [T26316] Net: connected | sent 707 recv 114 rejected 0 | rtt 30.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 707 recv 114 send errors 0 | session 3 | relay 100 | ping 24 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:11:14.080] INF [T26316] Local: pos (-20627.13, 618.99, -6824.41) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:14.080] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:14.080] INF [T26316] Overlay: installed true disabled false | presents 5768 drawn 5767 | queue ExecuteCommandLists (present thread)
-[17:11:19.079] INF [T26316] Net: connected | sent 805 recv 124 rejected 0 | rtt 33.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 805 recv 124 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:11:19.079] INF [T26316] Net: connected | sent 805 recv 124 rejected 0 | rtt 33.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 805 recv 124 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:11:19.079] INF [T26316] Local: pos (-20622.66, 619.09, -6822.28) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:19.079] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:19.079] INF [T26316] Overlay: installed true disabled false | presents 5894 drawn 5893 | queue ExecuteCommandLists (present thread)
 [17:11:20.124] INF [T26316] Timing: network loop's enemy/zone work, 10 s: 598 loops | p50 0.0 p95 0.0 max 0.1 ms
-[17:11:24.082] INF [T26316] Net: connected | sent 902 recv 134 rejected 0 | rtt 33.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 902 recv 134 send errors 0 | session 3 | relay 100 | ping 24 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 58 B, queue 0 ms
+[17:11:24.082] INF [T26316] Net: connected | sent 902 recv 134 rejected 0 | rtt 33.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 902 recv 134 send errors 0 | session 3 | relay 100 | ping 24 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 58 B, queue 0 ms
 [17:11:24.082] INF [T26316] Local: pos (-20603.35, 621.44, -6824.14) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:24.082] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:24.082] INF [T26316] Overlay: installed true disabled false | presents 6034 drawn 6033 | queue ExecuteCommandLists (present thread)
-[17:11:29.107] INF [T26316] Net: connected | sent 1000 recv 144 rejected 0 | rtt 35.1 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 1000 recv 144 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:11:29.107] INF [T26316] Net: connected | sent 1000 recv 144 rejected 0 | rtt 35.1 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 1000 recv 144 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (20 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:11:29.108] INF [T26316] Local: pos (-20605.38, 620.95, -6825.87) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:29.108] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:29.108] INF [T26316] Overlay: installed true disabled false | presents 6170 drawn 6169 | queue ExecuteCommandLists (present thread)
 [17:11:30.131] INF [T26316] Timing: network loop's enemy/zone work, 10 s: 594 loops | p50 0.0 p95 0.0 max 0.1 ms
-[17:11:34.092] INF [T26316] Net: connected | sent 1099 recv 154 rejected 0 | rtt 38.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id 76561199441047799 | sent 1099 recv 154 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
+[17:11:34.092] INF [T26316] Net: connected | sent 1099 recv 154 rejected 0 | rtt 38.5 ms | remote states 0 | last remote none | reliable pending 0 refused 0 | unknown kinds 0 | steam: id <STEAMID-CONVIDADO> | sent 1099 recv 154 send errors 0 | session 3 | relay 100 | ping 26 ms, out 1.6 KB/s (19 pkt/s), in 0.1 KB/s, send rate 256 KB/s, pending 0 B, queue 0 ms
 [17:11:34.092] INF [T26316] Local: pos (-20598.93, 622.71, -6826.84) rot (0.000, 0.000, 0.000, 1.000) hp 1125.0/1125.0 stamina 320.0/320.0 | check vs game global 2097558656.00 m
 [17:11:34.092] INF [T26316] co-op: other player not loaded | events in 0 | clock offset unknown (target -) | reliable pending 0 | outbox dropped 0
 [17:11:34.092] INF [T26316] Overlay: installed true disabled false | presents 6305 drawn 6304 | queue ExecuteCommandLists (present thread)

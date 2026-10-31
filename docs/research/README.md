@@ -1,3 +1,9 @@
+﻿> **Ha um indice organizado desta pasta: [INDICE.md](INDICE.md).**
+> Use-o. Sao mais de 80 arquivos em espanhol e portugues, escritos ao longo de meses, e
+> sem o indice a pasta e' impenetravel. O documento de estado do projeto e'
+> `../DOSSIE.md`.
+
+---
 # Research notes (index)
 
 These are the working notes written while building the mod, **in Spanish**, in roughly the

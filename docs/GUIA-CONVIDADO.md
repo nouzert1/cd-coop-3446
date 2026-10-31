@@ -1,4 +1,4 @@
-# Instalação do CONVIDADO — passo a passo
+﻿# Instalação do CONVIDADO — passo a passo
 
 Você vai entrar no mundo do anfitrião. Este arquivo tem **os comandos prontos para copiar e colar**.
 
@@ -104,10 +104,10 @@ pode ser de outro mod, e sobrescrever quebra os dois.
 **Baixe o zip** — link direto, já com o kit de convidado:
 
 ```
-https://github.com/nouzert1/cd-coop-3446/releases/download/v0.16.0-3460/cdmp-3460-test-kit.zip
+https://github.com/REPO_OWNER/cd-coop-3446/releases/download/v0.16.0-3460/cdmp-3460-test-kit.zip
 ```
 
-Ou, se preferir a página: [**releases**](https://github.com/nouzert1/cd-coop-3446/releases) →
+Ou, se preferir a página: [**releases**](https://github.com/REPO_OWNER/cd-coop-3446/releases) →
 `v0.16.0-3460`.
 
 > ⚠️ **Só use a `v0.16.0-3460`.** Todas as releases anteriores (`v0.15.0-3446` e abaixo) são de
@@ -174,7 +174,7 @@ Select-String -Path "$game\cdmp.ini" -Pattern '^\[|^role=|^peer_steamid=|^transp
 transport=steam
 role=guest                          ← você é o convidado
 [steam]
-peer_steamid=76561199441047799      ← SteamID do anfitrião, já preenchido
+peer_steamid=<STEAMID-CONVIDADO>      ← SteamID do anfitrião, já preenchido
 [coop]
 enabled=1                           ← o interruptor principal
 ```
@@ -368,7 +368,7 @@ Depois:
 
 ```powershell
 cd $env:USERPROFILE\Downloads
-Invoke-WebRequest "https://raw.githubusercontent.com/nouzert1/cd-coop-3446/master/scripts/diagnostico-convidado.ps1" -OutFile diagnostico.ps1
+Invoke-WebRequest "https://raw.githubusercontent.com/REPO_OWNER/cd-coop-3446/master/scripts/diagnostico-convidado.ps1" -OutFile diagnostico.ps1
 powershell -ExecutionPolicy Bypass -File .\diagnostico.ps1
 ```
 

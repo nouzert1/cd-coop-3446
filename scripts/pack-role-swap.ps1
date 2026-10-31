@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Builds the two kits for the ROLE-SWAP test: you as guest, the other player as host.
 
@@ -16,7 +16,7 @@
   script refuses to pack if the binary is stale against git HEAD.
 
 .EXAMPLE
-  .\pack-role-swap.ps1 -HostSteamId 76561198410974148 -GuestSteamId 76561199441047799
+  .\pack-role-swap.ps1 -HostSteamId <STEAMID-ANFITRIAO> -GuestSteamId <STEAMID-CONVIDADO>
 #>
 
 [CmdletBinding()]

@@ -1,4 +1,4 @@
-# Estado do projeto — 31 de outubro de 2026, 18:15
+﻿# Estado do projeto — 31 de outubro de 2026, 18:15
 
 **Documento de encerramento.** Escrito antes do teste final, para que o resultado — seja
 qual for — não precise ser reconstruído depois.
@@ -10,13 +10,13 @@ qual for — não precise ser reconstruído depois.
 Um mod de co-op para Crimson Desert **1.0.0.3460**, build **`D7FE9358`**, com dois kits de
 instalação prontos e publicados.
 
-**Repositório:** https://github.com/nouzert1/cd-coop-3446
-**Release atual:** https://github.com/nouzert1/cd-coop-3446/releases/tag/v0.18.0-3460-fix
+**Repositório:** https://github.com/REPO_OWNER/cd-coop-3446
+**Release atual:** https://github.com/REPO_OWNER/cd-coop-3446/releases/tag/v0.18.0-3460-fix
 
 | Kit | Para quem | Papel |
 |---|---|---|
-| `cdmp-3460-role-swap-host.zip` | luan26david | anfitrião |
-| `cdmp-3460-role-swap-guest.zip` | Nouzert SKINS | convidado |
+| `cdmp-3460-role-swap-host.zip` | ANFITRIAO | anfitrião |
+| `cdmp-3460-role-swap-guest.zip` | CONVIDADO | convidado |
 
 ---
 
@@ -120,7 +120,7 @@ Os avisos de startup na 3460 são offsets ainda não recuperados e **não impede
 
 **O que fazer com o que existe:**
 
-1. **Os dumps.** `C:\Users\ACER\AppData\Local\CrashDumps\CrimsonDesert.exe.*.dmp` guardam a
+1. **Os dumps.** `<USER>\AppData\Local\CrashDumps\CrimsonDesert.exe.*.dmp` guardam a
    pilha de crashes reais. O WinDbg está instalado nesta máquina. Um dump de crash vale
    mais que qualquer quantidade de logs.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
   Watches for the game's death and preserves everything the moment it happens.
 
   The crashes on 31 Oct 2026 were losing their evidence: the log was rotated by the next
@@ -11,7 +11,7 @@
 
 $g   = 'C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64'
 $out = Join-Path $env:TEMP 'cdmp_vigia.log'
-$dst = 'C:\Users\ACER\Desktop\CD-evidencias'
+$dst = '<USER>\Desktop\CD-evidencias'
 
 New-Item -ItemType Directory $dst -Force | Out-Null
 "=== vigia comecou $(Get-Date -Format 'HH:mm:ss') ===" | Set-Content $out -Encoding UTF8

@@ -35,7 +35,7 @@ gerado em 2026-10-31 17:07:19
   [net] enabled          = 1
   [net] transport        = steam
   [net] role             = guest
-  [steam] peer_steamid     = 76561199441047799
+  [steam] peer_steamid     = <STEAMID-CONVIDADO>
   [room] code             = 
   [overlay] enabled          = 1
   [sniffer] enabled          = 1
@@ -86,4 +86,4 @@ gerado em 2026-10-31 17:07:19
 
 ----------------------------------------------------------------------
 Mande ESTE ARQUIVO INTEIRO para o anfitriao:
-  C:\Users\Luan\Desktop\cdmp-diagnostico-2026-10-31-1707.txt
+  <USER>\Desktop\cdmp-diagnostico-2026-10-31-1707.txt

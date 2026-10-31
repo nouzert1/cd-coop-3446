@@ -1,5 +1,5 @@
-$ErrorActionPreference = 'Continue'
-$probe = "C:\Users\ACER\Downloads\Mods\CD-coop-3424\build\bin\RelWithDebInfo\cdmp_probe.exe"
+﻿$ErrorActionPreference = 'Continue'
+$probe = "<USER>\Downloads\Mods\CD-coop-3424\build\bin\RelWithDebInfo\cdmp_probe.exe"
 $exe = "C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64\CrimsonDesert.exe"
 
 # Work in IMAGE-RELATIVE offsets throughout. The probe prints and accepts "exe+0xNNN",

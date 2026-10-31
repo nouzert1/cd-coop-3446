@@ -1,4 +1,4 @@
-<#
+﻿<#
   Final-test watcher. Captures everything, automatically, and writes a single verdict file.
 
   This runs for the test that decides whether the project continues. Two consequences shape
@@ -18,7 +18,7 @@
 
 $g    = 'C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64'
 $log  = Join-Path $g 'cdmp.log'
-$base = 'C:\Users\ACER\Desktop\CD-TESTE-FINAL'
+$base = '<USER>\Desktop\CD-TESTE-FINAL'
 $out  = Join-Path $base 'andamento.txt'
 
 New-Item -ItemType Directory $base -Force | Out-Null

@@ -1,4 +1,4 @@
-# Compara os xrefs de um global entre dois builds.
+﻿# Compara os xrefs de um global entre dois builds.
 #
 # Feito para NAO repetir o erro que produziu a saida ilegivel "071138 refs": a linha de
 # resumo do probe e' "N reference(s)" e um -replace '\D','' nela cola o hexadecimal do
@@ -11,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$probe = "C:\Users\ACER\Downloads\Mods\CD-coop-3424\build\bin\RelWithDebInfo\cdmp_probe.exe"
+$probe = "<USER>\Downloads\Mods\CD-coop-3424\build\bin\RelWithDebInfo\cdmp_probe.exe"
 $imageBase = 0x140000000
 
 function Get-XrefCount([string] $exe, [uint64] $abs) {

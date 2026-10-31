@@ -1,4 +1,4 @@
-# Teste de 2 PCs — 31/10/2026, 17:08–17:14 (terceira tentativa)
+﻿# Teste de 2 PCs — 31/10/2026, 17:08–17:14 (terceira tentativa)
 
 **Resultado: o co-op FUNCIONOU nos dois lados. O anfitrião morreu 1 segundo depois.**
 
@@ -9,8 +9,8 @@ mesmo estado e o log de cada um permite ver o outro.
 
 | | |
 |---|---|
-| Anfitrião | `Nouzert SKINS` (76561199441047799), build `215C5636`, sala `1YZDAWX` |
-| Convidado | `luan26david` (76561198410974148), build `215C5636` |
+| Anfitrião | `CONVIDADO` (<STEAMID-CONVIDADO>), build `215C5636`, sala `1YZDAWX` |
+| Convidado | `ANFITRIAO` (<STEAMID-ANFITRIAO>), build `215C5636` |
 | Jogo | 1.0.0.3460 (PE `0x6AE58024`) nos dois |
 
 ## Linha do tempo

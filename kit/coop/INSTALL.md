@@ -1,4 +1,4 @@
-# INSTALL.md — instructions for an automated agent
+﻿# INSTALL.md — instructions for an automated agent
 
 This file is written for an AI coding agent (Claude Code, Codex, Cursor, or similar)
 installing the Crimson Desert co-op mod on a Windows PC. A human-readable guide is in
@@ -173,7 +173,7 @@ Check the config is the guest profile:
 Get-Content "$game\cdmp.ini" -Encoding Unicode | Select-String '^\s*(role|peer_steamid|transport)\s*='
 ```
 
-Expected: `transport=steam`, `role=guest`, `peer_steamid=76561199441047799` (the host's
+Expected: `transport=steam`, `role=guest`, `peer_steamid=<STEAMID-CONVIDADO>` (the host's
 SteamID64). This kit is already configured; nothing needs editing.
 
 ---

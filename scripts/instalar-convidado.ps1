@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Installs the GUEST kit after a Steam integrity check, verifying every step by hash.
 
@@ -27,7 +27,7 @@ param(
     # The game's bin64.
     [string] $GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64',
     # The other player's SteamID64, written into [steam] peer_steamid.
-    [string] $PeerSteamId = '76561198410974148'
+    [string] $PeerSteamId = '<STEAMID-ANFITRIAO>'
 )
 
 $ErrorActionPreference = 'Stop'

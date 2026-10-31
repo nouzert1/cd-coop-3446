@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Coleta o estado do mod de co-op do Crimson Desert no PC do CONVIDADO.
 
@@ -147,7 +147,7 @@ if (Test-Path $asiPath) {
         Add-Line "  $($k[0].ToUpper()): $($k[1])"
         if ($k[0] -eq 'velho') {
             Add-Line "    -> Baixe a v0.16.0-3460 e copie por cima:"
-            Add-Line "       https://github.com/nouzert1/cd-coop-3446/releases"
+            Add-Line "       https://github.com/REPO_OWNER/cd-coop-3446/releases"
             Add-Line "       Sem isto o crash do spawn continua, e o log nao vai dizer por que."
         }
     } else {

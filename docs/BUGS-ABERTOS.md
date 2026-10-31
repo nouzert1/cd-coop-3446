@@ -5,49 +5,153 @@ Written for someone picking this up. Ordered by **value per hour**, not by diffi
 Everything here is stated with what is actually known. Where a cause is unknown, it says so — in
 this project, an unexplained failure has three times been mislabelled and then re-opened later.
 
+**Last updated 31 Oct 2026, after the final 2-PC test. `/docs/DOSSIE.md` is the fuller record;
+this file is the work queue.**
+
 ---
 
 ## TIER 1 — blocks everything else
 
-### 1.1 The 2-PC test has never passed
+### 1.1 The host dies when the guest's character is injected ⭐ **the one real blocker**
 
-**State:** unknown cause.
+**State:** unknown cause, but **isolated to 174 ms and to a single code path.**
 
-> Do two PCs connect **and** does the guest see the host's character in the world?
+This replaces the old entry "the 2-PC test has never passed", which is no longer accurate. Three
+2-PC tests on 31 Oct 2026 established much more than that entry claimed:
 
-An earlier attempt (mod builds `2BE49E66` × `1B7B429D`) connected, agreed on the build, and showed
-**no character**. That was attributed at the time to the build mismatch; reading the code later
-showed that attribution was **wrong** — `check_build()` only records a warning and returns, and
-nothing on the spawn path reads it. So the cause of that failure is still unknown.
+| | Result |
+|---|---|
+| Both games open, reach the world | ✅ |
+| Steam session connects, rtt ~30 ms | ✅ |
+| Position read correctly on both machines | ✅ |
+| **Guest sees the host's character and survives** | ✅ `co-op: other player loaded` |
+| **Host receives the guest's character, injects it, and the process dies** | ❌ |
 
-**What is already ruled out:**
+So the direction guest←host **works**. The direction host←guest kills the host. That asymmetry is
+the problem, and it did not exist in the old entry.
 
-- Version mismatch (the two builds were compared and the code path does not block).
-- Position exchange (it worked; the panel showed a distance).
+**The exact sequence**, from `docs/research/crash-final-2026-10-31-1817-host.log`:
 
-**Why this is first:** every other feature — shared loot, joint bosses, enemy relay — depends on the
-puppet existing. If you fix only one thing, fix this.
+```
+[18:17:25.484] Co-op: received the other player's character (39795 bytes, spawn 1)
+[18:17:25.487] Puppet: rewrote keys in user packet: user x3, player x104, body x0
+[18:17:25.487] Puppet: rewrote keys in body packet: user x4, player x104, body x8
+[18:17:25.487] Puppet: spawn queued at (-20626.6, 621.3, -6813.7) (2 packets, 16637 + 6445)
+[18:17:25.510] Inject: delivered opcode 2005 (16642 bytes) to ClientNet::OnRecvPacket
+[18:17:25.510] Inject: delivered opcode 2005 (6450 bytes) to ClientNet::OnRecvPacket
+                >>> END OF LOG. THE PROCESS DIED HERE. <<<
+```
 
-**How to start:** run the test with packet recording on. The spawn path is
-`src/mod/net/remote_puppet.cpp`, which synthesises an `ActorLoadDataAck`. Compare the bytes it emits
-against a **real** `ActorLoadDataAck` captured from the game's own traffic
-(`docs/research/cargas-de-ator-3446.md` — the file name is Spanish, "cargas de ator"). The most
-likely defect is a field the game validates and the mod fills plausibly — the same shape as the three
-false results already found in this port.
+**What this rules out**, and each was a live hypothesis before:
+
+- Not the mod stalling in the injection — **both injections completed and returned**.
+- Not a catchable exception — the `__try/__except` around the injection did **not** fire.
+- Not a silent `TerminateProcess`/`ExitProcess` — the exit watch did not record one.
+- Not the position — it arrived correct, `(-20626.6, 621.3, -6813.7)`, not `(0,0,0)`.
+
+**What is left:** the game accepts the packet, begins creating the actor, and dies inside its own
+processing of it.
+
+**How to start — do this first:**
+
+Enable packet recording in `cdmp.ini` and reproduce:
+
+```ini
+[sniffer]
+enabled=1
+record=1
+```
+
+This captures the exact bytes to `cdmp_packets_<date>.log` and `.bin`. **It has never been used in
+any test so far**, and the 23 ms timing now makes the capture viable — you know the instant to look
+at. Compare the mod's `ActorLoadDataAck` byte for byte against a **real** one captured from the
+game's own traffic. `docs/research/cargas-de-ator-3446.md` documents the format.
+
+**The strongest unexplained clue** — the payload sizes differ between sessions for the same
+character:
+
+| Session | user | body |
+|---|---|---|
+| 17:11 host | 16932 | 6445 |
+| 17:11 guest | 16500 | 6453 |
+| 18:17 host | 16637 | 6445 |
+
+The guest survived injecting `16500+6453`; the host died on `16637+6445`. If the packet format were
+simply wrong, the size is where it should show. **This asymmetry has never been investigated.**
+
+**Second tool:** there are crash dumps for real crashes at
+`%LOCALAPPDATA%\CrashDumps\CrimsonDesert.exe.<pid>.dmp`. **WinDbg is installed.** `!analyze -v`
+gives module, offset and stack in minutes. It will not give the "why", but it collapses the search
+space.
+
+**Code:** `src/mod/net/remote_puppet.cpp` — packet synthesis and the key rewrite.
 
 ---
 
-### 1.2 The host hang/crash
+### 1.2 The host hang/crash — **this entry is now 1.1**
 
-**State:** unknown cause. No crash dump has ever been captured.
+Merged into 1.1 above. The former text described four `AppHangTransient` records with no crash and
+no dump; crash dumps **do** exist now, and WinDbg is installed on the development machine.
 
-Four `AppHangTransient` records in the Event Viewer, **no crash**. There is no `cdb`, `windbg`, `kd`,
-`dotnet-dump` or `procdump` on the machine this was developed on, and `LocalDumps` is HKLM-only
-(needs admin).
+One thing from the old entry worth keeping: on the 17:11 run the host died immediately after
+`Inject: delivered opcode 2005 (16937 bytes)`, **while the guest passed through the equivalent
+injection and survived**. Same asymmetry, same open question.
 
-**What is known:** it happens when the other player's character is injected into the host's world.
-`kit/coop/INVESTIGATION.md` carries the exact log transcript, four candidate causes with the
-cheapest experiment first, and the tool invocation for each.
+---
+
+### 1.3 The `RaiseException` hook — **FIXED, do not reintroduce**
+
+Closed 31 Oct 2026. Recorded here because it was Tier 1 and because the lesson is worth more than
+the fix.
+
+Both players' games died **before the main menu**, on two different machines, on build `A8AE702B`.
+Comparing against the build that had worked earlier the same day left **exactly one change**:
+
+```
+src/mod/game/exit_watch.cpp | 186 +++
+src/mod/game/exit_watch.h   |  34 +++
+src/mod/mod.cpp             |   6 ++
+```
+
+`RaiseException` is not an error path. The MSVC C++ runtime raises it as ordinary control flow —
+thread naming, every `throw`, SEH probes — thousands of times during a healthy startup. The hook
+ran a logging call and a stack walk inside exception dispatch, on a thread that may hold the CRT or
+loader lock, and did it again on every subsequent raise.
+
+Fixed in `D7FE9358`. The exit hooks now write into a fixed pre-allocated buffer with no allocation,
+no locks and no formatting. `tests/exit_watch_self_test.cpp` verifies that `RaiseException` is
+**not** patched and survives **2000 consecutive throws**, and fails loudly if it ever is.
+
+**The part worth remembering:** the self test passed throughout, because it called the patched
+function once from a quiet thread — the one situation in which that failure cannot appear.
+"It compiles, it installs, and the test passes" was true of a hook that broke two people's games.
+
+---
+
+## TIER 2 — features that fail closed
+
+These are **not** defects. The mod deliberately refuses to operate when it has no trustworthy
+data. Each is a candidate for recovery, not a bug report.
+
+| Feature | Guard / symptom | Where |
+|---|---|---|
+| Remote puppet rotation | `rot (0.000, 0.000, 0.000, 1.000)` — no basis computed | `src/mod/game/player_reader.cpp` |
+| Time sync | `clock offset unknown` | 3460 offsets unrecovered |
+| Minimap icon | `Minimap: icon function not recognised` | 3460 offset unrecovered |
+| Horse | `HorseDiag: CC update (exe+0x941D40) not recognised` | 3460 offset unrecovered |
+| Enemy copies | `Enemy relay: wanted but not started` | 3460 offset unrecovered |
+| Game error logging | `Game errors: logger not recognised; not hooked` | 3460 offset unrecovered |
+| `OtherEquipItemAck` | `Capture: OtherEquipItemAck writer not recognised` | **Also wrong on 3446** — the route is the `TrocTrOtherEquipItemAck` handler |
+
+None of these prevent connecting. `docs/PORTING.md` has the method for recovering offsets.
+
+---
+
+## TIER 3 — never exercised
+
+- The `Ctrl+Home` lab test with natives — **never run**, see `CAMPO-HORA-NAO-EXERCITADO.md`
+- Joint bosses (phase D2): boss copy record types **4 and 7**
+- Vehicles (type 5) — deliberately deferred
 
 **Highest-value contribution:** get a stack. If you have a Windows debugging setup, that alone may
 close this.

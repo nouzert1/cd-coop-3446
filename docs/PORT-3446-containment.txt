@@ -1,4 +1,4 @@
-CONTAINMENT HOOKS ON 1.0.0.3446 - measurement log
+﻿CONTAINMENT HOOKS ON 1.0.0.3446 - measurement log
 ================================================
 
 Goal: the four `Site` entries in src/mod/net/horse_diag.cpp that must ALL match for the
@@ -229,7 +229,7 @@ THE BREAKTHROUGH: A 3424 EXECUTABLE SURVIVED ON DISK
 The whole session had been treating the 3424 addresses as known points and their bytes as
 the only anchor. That was the hard way round. A copy of the old executable was sitting at
 
-  C:\Users\ACER\Downloads\Mods\CD-ref\_scan\CrimsonDesert.exe   (320.7 MB)
+  <USER>\Downloads\Mods\CD-ref\_scan\CrimsonDesert.exe   (320.7 MB)
   PE timestamp 0x6AE387F2 -> build 1.0.0.3424
 
 so the two builds can be DIFFED instead of guessed at. Everything below came from that.

@@ -1,4 +1,4 @@
-# COMO INSTALAR O KIT CONVIDADO — leia isto primeiro
+﻿# COMO INSTALAR O KIT CONVIDADO — leia isto primeiro
 
 Você é o **CONVIDADO** (guest) neste teste. O outro jogador é o anfitrião.
 
@@ -70,7 +70,7 @@ Select-String -Path "$g\cdmp.ini" -Pattern '^role=|^peer_steamid=|^code=' -Encod
 cdmp.asi  : 43335AA91BA673EFE8EAA440E30535C03E302EA55467DA3F68969524A1992256
 winmm.dll : 031A3E5576D91DCE1E438D36B9A3D462C7334AB4791990A8FF1E3DDC0E132DAF
 role=guest
-peer_steamid=76561198410974148
+peer_steamid=<STEAMID-ANFITRIAO>
 code=
 ```
 
