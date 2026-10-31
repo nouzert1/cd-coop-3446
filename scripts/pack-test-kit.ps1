@@ -45,6 +45,22 @@ if (Get-Process CrimsonDesert -ErrorAction SilentlyContinue) {
 # spawn path reads it. The stale-build check below is still worth having, because two
 # sides on different builds is an uncontrolled test, but overstating what the mismatch
 # does sends the next person looking in the wrong place.)
+#
+# A NOTE ON THE SHA256, measured rather than assumed: THE BUILD IS NOT BIT-REPRODUCIBLE.
+# Building the identical source twice produced 4346880-byte binaries differing in 4769,
+# 7789 and 575213 bytes across .text/.rdata/.reloc. Measured cause: MSVC merges the .obj
+# files in a parallel-dependent order, so the string pool lands at different offsets and
+# every pointer to it moves. The 33660 log strings are identical as a SET; only their
+# addresses change.
+#
+# This does NOT affect compatibility, and the reason is worth stating: the mod compares
+# kModBuild, a constexpr baked in from build_id.h, NOT a file hash. Two people who build
+# the same commit get different SHA256s and still pair correctly.
+#
+# So the SHA256 in SHA256SUMS.txt proves "this is the file I tested" -- which is exactly
+# what it is for, and is why it is recorded at all. It does NOT prove "this came from
+# commit X", and it must never be used to compare two people's builds. Use the build id
+# shown in the HUD for that.
 $idHeader = Join-Path $root 'build\generated\build_id.h'
 $head = (& git -C $root rev-parse --short=8 HEAD 2>$null)
 if ($LASTEXITCODE -ne 0 -or -not $head) {
